@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # SkyWings - Flight Booking (coupon_management)
 
 React + Vite frontend, ASP.NET Core Web API (EF Core, JWT) backend, SQL Server database.
@@ -67,3 +68,6 @@ coupon_management/
 - Backend unit tests cover authentication, booking/coupon workflows, and flight behavior.
 - Flight and booking fare displays use the distance-based fare rule, consistent Indian Rupee
   formatting, and no default/fallback fares.
+=======
+# coupon_management
+>>>>>>> 9346113dfe1f831a75908df2f429a6c679a3ae55
