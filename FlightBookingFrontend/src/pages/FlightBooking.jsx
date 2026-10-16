@@ -820,7 +820,7 @@ export default function FlightBooking() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600 }}>
-                <span>Promo Coupon Discount{appliedCoupon ? ` (${appliedCoupon.couponCode})` : ''}</span>
+                <span>Promo Coupon Discount</span>
                 <span>-{formatINR(discountAmount)}</span>
               </div>
 
