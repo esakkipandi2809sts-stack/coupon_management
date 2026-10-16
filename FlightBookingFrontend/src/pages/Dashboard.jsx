@@ -11,7 +11,8 @@ import {
   RefreshCw,
   Sparkles
 } from 'lucide-react';
-import { couponApi, dashboardApi } from '../services/api';
+// import { couponApi, dashboardApi } from '../services/api';
+import { couponApi, dashboardApi, bookingApi } from '../services/api';
 import { authUtil } from '../utils/auth';
 import { formatINR } from '../utils/flightPricing';
 
@@ -100,9 +101,22 @@ export default function Dashboard() {
       const dashRes = await dashboardApi.getStatistics();
       setDashboardStats(dashRes.data);
 
-      // 3. Fetch Recent Bookings
-      const recentRes = await dashboardApi.getRecentBookings(5);
-      setRecentBookings(recentRes.data);
+      // 3. Fetch only the logged-in user's bookings
+      const recentRes = await bookingApi.getMyBookings();
+
+      const userBookings = Array.isArray(recentRes.data)
+        ? recentRes.data
+        : [];
+
+      const sortedBookings = [...userBookings].sort(
+        (a, b) =>
+          new Date(b.bookingDate).getTime() -
+          new Date(a.bookingDate).getTime()
+      );
+
+      setRecentBookings(sortedBookings.slice(0, 5));
+
+
 
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -325,7 +339,7 @@ export default function Dashboard() {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Booking Statistics</h3>            
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Booking Statistics</h3>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
