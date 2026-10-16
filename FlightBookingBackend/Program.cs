@@ -1,5 +1,6 @@
-using System.Text;
+
 using System.Security.Claims;
+using System.Text;
 using FlightBookingBackend.Data;
 using FlightBookingBackend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -9,52 +10,84 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Add DbContext
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+// 1. Configure SQL Server Database
+var connectionString =
+    builder.Configuration.GetConnectionString("DefaultConnection");
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "Connection string 'DefaultConnection' is missing from configuration.");
+}
+
 builder.Services.AddDbContext<FlightBookingDbContext>(options =>
     options.UseSqlServer(connectionString));
 
-// 2. Add Dependency Injection Services
+// 2. Register Application Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IFlightService, FlightService>();
 builder.Services.AddScoped<ICouponService, CouponService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<CouponStatusBackgroundService>();
 
+// Register the coupon percentage calculation service.
+// This service must use FlightBookingDbContext.
+builder.Services.AddScoped<CouponCalculationService>();
+
 // 3. Configure JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"];
-if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
+
+if (string.IsNullOrWhiteSpace(jwtKey) ||
+    Encoding.UTF8.GetByteCount(jwtKey) < 32)
 {
     throw new InvalidOperationException(
-        "Configure Jwt:Key with a secret of at least 32 bytes using user-secrets or the deployment secret manager.");
+        "Configure Jwt:Key with a secret of at least 32 bytes " +
+        "using user-secrets or the deployment secret manager.");
 }
-var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "FlightBookingAPI";
-var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "FlightBookingApp";
 
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.RequireHttpsMetadata = false;
-    options.SaveToken = true;
-    options.TokenValidationParameters = new TokenValidationParameters
+var jwtIssuer =
+    builder.Configuration["Jwt:Issuer"] ?? "FlightBookingAPI";
+
+var jwtAudience =
+    builder.Configuration["Jwt:Audience"] ?? "FlightBookingApp";
+
+builder.Services
+    .AddAuthentication(options =>
     {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-        RoleClaimType = ClaimTypes.Role,
-        ValidateIssuer = true,
-        ValidIssuer = jwtIssuer,
-        ValidateAudience = true,
-        ValidAudience = jwtAudience,
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero
-    };
-});
+        options.DefaultAuthenticateScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+
+        options.DefaultChallengeScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = false;
+        options.SaveToken = true;
+
+        options.TokenValidationParameters =
+            new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+
+                IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(jwtKey)),
+
+                RoleClaimType = ClaimTypes.Role,
+
+                ValidateIssuer = true,
+                ValidIssuer = jwtIssuer,
+
+                ValidateAudience = true,
+                ValidAudience = jwtAudience,
+
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            };
+    });
 
 builder.Services.AddAuthorization();
 
@@ -70,32 +103,41 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 5. Add Controllers and JSON configuration
-builder.Services.AddControllers()
+// 5. Register Controllers and JSON Configuration
+builder.Services
+    .AddControllers()
     .AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
-        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.ReferenceHandler =
+            System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+
+        options.JsonSerializerOptions.PropertyNamingPolicy =
+            System.Text.Json.JsonNamingPolicy.CamelCase;
     });
 
-// 6. Configure Swagger/OpenAPI with JWT Bearer support
+// 6. Configure Swagger / OpenAPI with JWT Bearer support
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "Flight Ticket Booking Management API",
         Version = "v1",
-        Description = "Enterprise Flight Ticket Booking & Coupon Management REST API with ASP.NET Core and SQL Server"
+        Description =
+            "Flight Ticket Booking and Coupon Management API"
     });
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+        Description =
+            "JWT Authorization header. Example: Bearer {token}",
+
         Name = "Authorization",
         In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
     });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -114,32 +156,44 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// 7. Build the Application
 var app = builder.Build();
 
-// 7. Auto-initialize the database
+// 8. Initialize the Existing Database
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+
     try
     {
-        var context = services.GetRequiredService<FlightBookingDbContext>();
+        var context =
+            services.GetRequiredService<FlightBookingDbContext>();
+
         DbInitializer.Initialize(context);
     }
     catch (Exception ex)
     {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogCritical(ex, "Database initialization failed.");
+        var logger =
+            services.GetRequiredService<ILogger<Program>>();
+
+        logger.LogCritical(
+            ex,
+            "Database initialization failed.");
+
         throw;
     }
 }
 
-// Configure the HTTP request pipeline.
+// 9. Configure HTTP Request Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
+
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Flight Booking API v1");
+        c.SwaggerEndpoint(
+            "/swagger/v1/swagger.json",
+            "Flight Booking API v1");
     });
 }
 
