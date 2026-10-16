@@ -34,7 +34,7 @@ export default function FlightBooking() {
   const [passengerName, setPassengerName] = useState(user?.fullName || '');
   const [passengerEmail, setPassengerEmail] = useState(user?.email || '');
   const [passengerPhone, setPassengerPhone] = useState(user?.phoneNumber || '');
-  const [passengerAge, setPassengerAge] = useState(28);
+  const [passengerAge, setPassengerAge] = useState();
   const [passengerGender, setPassengerGender] = useState('Male');
   const [seatNumber, setSeatNumber] = useState('14B');
   const [paymentMethod, setPaymentMethod] = useState('Credit Card');
@@ -61,6 +61,44 @@ export default function FlightBooking() {
     bookingRequestKeyRef.current = crypto.randomUUID();
   }
 
+  const [passengers, setPassengers] = useState([
+    {
+      name: '',
+      email: '',
+      phone: '',
+      age: '',
+      gender: '',
+      seat: '',
+    },
+  ]);
+
+  const addPassenger = () => {
+    if (passengers.length >= passengerCount) return;
+
+    setPassengers((prev) => [
+      ...prev,
+      {
+        name: '',
+        email: '',
+        phone: '',
+        age: '',
+        gender: '',
+        seat: '',
+      },
+    ]);
+  };
+
+  const removePassenger = (index) => {
+    setPassengers((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updatePassenger = (index, field, value) => {
+    setPassengers((prev) =>
+      prev.map((passenger, i) =>
+        i === index ? { ...passenger, [field]: value } : passenger
+      )
+    );
+  };
   // Form validation errors
   const [formErrors, setFormErrors] = useState({});
 
@@ -373,183 +411,196 @@ export default function FlightBooking() {
             <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '20px' }}>
               Passenger Details
             </h3>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {/* Name */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Passenger Full Name *
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input
-                    type="text"
-                    value={passengerName}
-                    onChange={(e) => setPassengerName(e.target.value)}
-                    placeholder="As shown on passport or government ID"
-                    style={{
-                      width: '100%',
-                      padding: '11px 16px 11px 42px',
-                      borderRadius: '12px',
-                      border: `1px solid ${formErrors.passengerName ? '#ef4444' : '#cbd5e1'}`,
-                      fontSize: '0.92rem',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-                {formErrors.passengerName && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{formErrors.passengerName}</span>}
-              </div>
 
-              {/* Email & Phone */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Email Address *
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Mail size={18} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type="email"
-                      value={passengerEmail}
-                      onChange={(e) => setPassengerEmail(e.target.value)}
-                      placeholder="Ticket will be sent here"
-                      style={{
-                        width: '100%',
-                        padding: '11px 16px 11px 42px',
-                        borderRadius: '12px',
-                        border: `1px solid ${formErrors.passengerEmail ? '#ef4444' : '#cbd5e1'}`,
-                        fontSize: '0.92rem',
-                        outline: 'none'
-                      }}
-                    />
+              {passengers.map((passenger, index) => {
+                const err = (formErrors && formErrors[index]) || {};
+                const takenSeats = passengers.map((p) => p.seat).filter(Boolean);
+
+                return (
+                  <div className="passenger-card" key={index}
+                    style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', background: '#fff' }}>
+
+                    <div className="passenger-header"
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                      <h4 style={{ margin: 0 }}>Passenger {index + 1}</h4>
+                      {index > 0 && (
+                        <button type="button" onClick={() => removePassenger(index)} className="remove-passenger-btn">
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                        Passenger Full Name *
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+                        <input
+                          type="text"
+                          value={passenger.name}
+                          onChange={(e) => updatePassenger(index, 'name', e.target.value)}
+                          placeholder="As shown on passport or government ID"
+                          style={{
+                            width: '100%', boxSizing: 'border-box', padding: '11px 16px 11px 42px', borderRadius: '12px',
+                            border: `1px solid ${err.name ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem', outline: 'none'
+                          }}
+                        />
+                      </div>
+                      {err.name && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.name}</span>}
+                    </div>
+
+                    {/* Email & Phone */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '14px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                          Email Address *
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                          <Mail size={18} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+                          <input
+                            type="email"
+                            value={passenger.email}
+                            onChange={(e) => updatePassenger(index, 'email', e.target.value)}
+                            placeholder="Ticket will be sent here"
+                            style={{
+                              width: '100%', boxSizing: 'border-box', padding: '11px 16px 11px 42px', borderRadius: '12px',
+                              border: `1px solid ${err.email ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem', outline: 'none'
+                            }}
+                          />
+                        </div>
+                        {err.email && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.email}</span>}
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                          Phone Number *
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                          <Phone size={18} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+                          <input
+                            type="tel"
+                            value={passenger.phone}
+                            onChange={(e) => updatePassenger(index, 'phone', e.target.value)}
+                            placeholder="+91 98765 43210"
+                            style={{
+                              width: '100%', boxSizing: 'border-box', padding: '11px 16px 11px 42px', borderRadius: '12px',
+                              border: `1px solid ${err.phone ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem', outline: 'none'
+                            }}
+                          />
+                        </div>
+                        {err.phone && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.phone}</span>}
+                      </div>
+                    </div>
+
+                    {/* Age, Gender & Seat */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                          Age *
+                        </label>
+                        <input
+                          type="number" min="1" max="120"
+                          value={passenger.age}
+                          onChange={(e) => updatePassenger(index, 'age', e.target.value)}
+                          style={{
+                            width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px',
+                            border: `1px solid ${err.age ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem', outline: 'none'
+                          }}
+                        />
+                        {err.age && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.age}</span>}
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                          Gender *
+                        </label>
+                        <select
+                          value={passenger.gender}
+                          onChange={(e) => updatePassenger(index, 'gender', e.target.value)}
+                          style={{
+                            width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px',
+                            border: `1px solid ${err.gender ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem',
+                            outline: 'none', backgroundColor: '#ffffff'
+                          }}
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        {err.gender && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.gender}</span>}
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                          Seat Number (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={passenger.seat}
+                          onChange={(e) => updatePassenger(index, 'seat', e.target.value)}
+                          placeholder="e.g. 14B"
+                          style={{
+                            width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px',
+                            border: `1px solid ${err.seat ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem',
+                            outline: 'none', fontWeight: 600
+                          }}
+                        />
+                        {err.seat && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.seat}</span>}
+                      </div>
+                    </div>
+
+                    {/* Quick Seat Selector Buttons (per passenger) */}
+                    {sampleSeats && sampleSeats.length > 0 && (
+                      <div style={{ marginTop: '12px' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+                          Select from Available Seats:
+                        </span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                          {sampleSeats.map((seat) => {
+                            const selected = passenger.seat === seat;
+                            const takenByOther = !selected && takenSeats.includes(seat);
+                            return (
+                              <button
+                                key={seat}
+                                type="button"
+                                disabled={takenByOther}
+                                onClick={() => updatePassenger(index, 'seat', seat)}
+                                style={{
+                                  padding: '6px 14px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700,
+                                  border: selected ? '2px solid #0284c7' : '1px solid #e2e8f0',
+                                  backgroundColor: selected ? '#e0f2fe' : '#f8fafc',
+                                  color: selected ? '#0284c7' : '#334155',
+                                  opacity: takenByOther ? 0.4 : 1,
+                                  cursor: takenByOther ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                {seat}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {formErrors.passengerEmail && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{formErrors.passengerEmail}</span>}
-                </div>
+                );
+              })}
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Phone Number *
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Phone size={18} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type="tel"
-                      value={passengerPhone}
-                      onChange={(e) => setPassengerPhone(e.target.value)}
-                      placeholder="+1 555-0199"
-                      style={{
-                        width: '100%',
-                        padding: '11px 16px 11px 42px',
-                        borderRadius: '12px',
-                        border: `1px solid ${formErrors.passengerPhone ? '#ef4444' : '#cbd5e1'}`,
-                        fontSize: '0.92rem',
-                        outline: 'none'
-                      }}
-                    />
-                  </div>
-                  {formErrors.passengerPhone && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{formErrors.passengerPhone}</span>}
-                </div>
-              </div>
+              {passengers.length < passengerCount && (
+                <button type="button" onClick={addPassenger} className="add-passenger-btn">
+                  <span>+</span> Add Passenger
+                </button>
+              )}
 
-              {/* Age, Gender & Seat Selector */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Age *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="120"
-                    value={passengerAge}
-                    onChange={(e) => setPassengerAge(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '11px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '0.92rem',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
+              <p>
+                Passenger details added: {passengers.length} / {passengerCount}
+              </p>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Gender *
-                  </label>
-                  <select
-                    value={passengerGender}
-                    onChange={(e) => setPassengerGender(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '11px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '0.92rem',
-                      outline: 'none',
-                      backgroundColor: '#ffffff'
-                    }}
-                  >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Seat Number *
-                  </label>
-                  <input
-                    type="text"
-                    value={seatNumber}
-                    onChange={(e) => setSeatNumber(e.target.value)}
-                    placeholder="e.g. 14B"
-                    style={{
-                      width: '100%',
-                      padding: '11px 14px',
-                      borderRadius: '12px',
-                      border: `1px solid ${formErrors.seatNumber ? '#ef4444' : '#cbd5e1'}`,
-                      fontSize: '0.92rem',
-                      outline: 'none',
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Quick Seat Selector Buttons */}
+              {/* Simulated Payment Method (once per booking) */}
               <div>
-                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
-                  Select from Available Seats:
-                </span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                  {sampleSeats.map((seat) => (
-                    <button
-                      key={seat}
-                      type="button"
-                      onClick={() => setSeatNumber(seat)}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '8px',
-                        fontSize: '0.82rem',
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-mono)',
-                        border: seatNumber === seat ? '2px solid #0284c7' : '1px solid #e2e8f0',
-                        backgroundColor: seatNumber === seat ? '#e0f2fe' : '#f8fafc',
-                        color: seatNumber === seat ? '#0284c7' : '#334155'
-                      }}
-                    >
-                      {seat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Simulated Payment Method */}
-              <div style={{ marginTop: '12px' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
                   Simulated Payment Method
                 </label>
@@ -559,24 +610,25 @@ export default function FlightBooking() {
                       key={method}
                       onClick={() => setPaymentMethod(method)}
                       style={{
-                        padding: '12px 14px',
-                        borderRadius: '12px',
+                        padding: '12px 14px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center',
+                        fontSize: '0.85rem', fontWeight: 600,
                         border: paymentMethod === method ? '2px solid #0284c7' : '1px solid #e2e8f0',
                         backgroundColor: paymentMethod === method ? '#f0f9ff' : '#ffffff',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
                         color: paymentMethod === method ? '#0284c7' : '#475569'
                       }}
                     >
-                      <CreditCard size={18} style={{ margin: '0 auto 4px' }} />
+                      <CreditCard size={18} style={{ margin: '0 auto 4px', display: 'block' }} />
                       <div>{method}</div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
+
+
+
+
+
           </div>
         </div>
 
