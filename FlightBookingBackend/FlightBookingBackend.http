@@ -1,0 +1,15 @@
+@FlightBookingBackend_HostAddress = http://localhost:6023
+
+### Register a passenger
+POST {{FlightBookingBackend_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Test Passenger",
+  "email": "test.passenger@example.com",
+  "phoneNumber": "+91 98765 43210",
+  "password": "Password123!",
+  "confirmPassword": "Password123!"
+}
+
+###
