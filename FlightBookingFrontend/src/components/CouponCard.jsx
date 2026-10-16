@@ -69,24 +69,7 @@ export default function CouponCard({ coupon, onApply }) {
         <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
           {formatINR(couponDiscountAmount)} OFF
         </h4>
-        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#0284c7', marginBottom: '8px' }}>
-          {Number(coupon.couponPoints) > 0 ? `${Math.round(coupon.couponPoints)} Points` : ''}
-          {Number(coupon.discountPercentage) > 0 ? ` · ${Math.round(coupon.discountPercentage)}%` : ''}
-        </div>
-        {coupon.originalFlightFare > 0 && (
-          <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '6px' }}>
-            <span>Fare: {formatINR(coupon.originalFlightFare)}</span>
-            {' → '}
-            <span style={{ fontWeight: 700, color: '#0f172a' }}>
-              Final: {formatINR(Math.max(0, Math.round(coupon.originalFlightFare - couponDiscountAmount)))}
-            </span>
-          </div>
-        )}
-        {coupon.ownerUsername && (
-          <p style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '8px' }}>
-            Passenger: {coupon.ownerUsername}
-          </p>
-        )}
+
       </div>
 
       {/* Middle Specs */}
