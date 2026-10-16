@@ -1,8 +1,8 @@
 
-using FlightBooking.Api.Models;
+using FlightBookingBackend.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace FlightBooking.Api.Data;
+namespace FlightBookingBackend.Data;
 
 public class ApplicationDbContext : DbContext
 {

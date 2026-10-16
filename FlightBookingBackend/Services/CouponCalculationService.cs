@@ -1,14 +1,14 @@
 
-using FlightBooking.Api.Data;
+using FlightBookingBackend.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace FlightBooking.Api.Services;
+namespace FlightBookingBackend.Services;
 
 public class CouponCalculationService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly FlightBookingDbContext _context;
 
-    public CouponCalculationService(ApplicationDbContext context)
+    public CouponCalculationService(FlightBookingDbContext context)
     {
         _context = context;
     }
@@ -82,14 +82,9 @@ public class CouponCalculationService
 public class CouponCalculationResult
 {
     public string AirlineName { get; set; } = string.Empty;
-
     public string CabinClass { get; set; } = string.Empty;
-
     public decimal BookingFare { get; set; }
-
     public decimal Percentage { get; set; }
-
     public decimal Points { get; set; }
-
     public decimal DiscountAmount { get; set; }
 }

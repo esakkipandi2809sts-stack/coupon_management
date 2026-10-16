@@ -1,28 +1,26 @@
-
-using FlightBooking.Api.Data;
-using FlightBooking.Api.Models;
-using FlightBooking.Api.Services;
+using FlightBookingBackend.Data;
+using FlightBookingBackend.Models;
+using FlightBookingBackend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace FlightBooking.Api.Controllers;
+namespace FlightBookingBackend.Controllers;
 
 [ApiController]
 [Route("api/coupon-percentage-rules")]
 public class CouponPercentageRulesController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
+    private readonly FlightBookingDbContext _context;
     private readonly CouponCalculationService _calculationService;
 
     public CouponPercentageRulesController(
-        ApplicationDbContext context,
+        FlightBookingDbContext context,
         CouponCalculationService calculationService)
     {
         _context = context;
         _calculationService = calculationService;
     }
 
-    // GET: api/coupon-percentage-rules
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -35,7 +33,6 @@ public class CouponPercentageRulesController : ControllerBase
         return Ok(rules);
     }
 
-    // GET: api/coupon-percentage-rules/1
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -49,13 +46,18 @@ public class CouponPercentageRulesController : ControllerBase
         return Ok(rule);
     }
 
-    // POST: api/coupon-percentage-rules
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] CouponPercentageRuleRequest request)
     {
-        var airline = request.AirlineName.Trim();
-        var cabin = request.CabinClass.Trim();
+        if (string.IsNullOrWhiteSpace(request.AirlineName) ||
+            string.IsNullOrWhiteSpace(request.CabinClass))
+        {
+            return BadRequest(new
+            {
+                message = "Airline name and cabin class are required."
+            });
+        }
 
         if (!IsValidPercentage(request.Percentage))
         {
@@ -64,6 +66,9 @@ public class CouponPercentageRulesController : ControllerBase
                 message = "Percentage must be between 0 and 100."
             });
         }
+
+        var airline = request.AirlineName.Trim();
+        var cabin = request.CabinClass.Trim();
 
         var duplicate = await _context.CouponPercentageRules
             .AnyAsync(x =>
@@ -90,26 +95,22 @@ public class CouponPercentageRulesController : ControllerBase
         _context.CouponPercentageRules.Add(rule);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = rule.Id },
-            rule);
+        return CreatedAtAction(nameof(GetById), new { id = rule.Id }, rule);
     }
 
-    // PUT: api/coupon-percentage-rules/1
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(
         int id,
         [FromBody] CouponPercentageRuleRequest request)
     {
-        var rule = await _context.CouponPercentageRules
-            .FirstOrDefaultAsync(x => x.Id == id);
-
-        if (rule == null)
-            return NotFound(new { message = "Coupon rule not found." });
-
-        var airline = request.AirlineName.Trim();
-        var cabin = request.CabinClass.Trim();
+        if (string.IsNullOrWhiteSpace(request.AirlineName) ||
+            string.IsNullOrWhiteSpace(request.CabinClass))
+        {
+            return BadRequest(new
+            {
+                message = "Airline name and cabin class are required."
+            });
+        }
 
         if (!IsValidPercentage(request.Percentage))
         {
@@ -118,6 +119,15 @@ public class CouponPercentageRulesController : ControllerBase
                 message = "Percentage must be between 0 and 100."
             });
         }
+
+        var rule = await _context.CouponPercentageRules
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (rule == null)
+            return NotFound(new { message = "Coupon rule not found." });
+
+        var airline = request.AirlineName.Trim();
+        var cabin = request.CabinClass.Trim();
 
         var duplicate = await _context.CouponPercentageRules
             .AnyAsync(x =>
@@ -144,7 +154,6 @@ public class CouponPercentageRulesController : ControllerBase
         return Ok(rule);
     }
 
-    // DELETE: api/coupon-percentage-rules/1
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
@@ -160,7 +169,6 @@ public class CouponPercentageRulesController : ControllerBase
         return Ok(new { message = "Coupon rule deleted successfully." });
     }
 
-    // POST: api/coupon-percentage-rules/calculate
     [HttpPost("calculate")]
     public async Task<IActionResult> Calculate(
         [FromBody] CouponCalculationRequest request)
@@ -184,28 +192,21 @@ public class CouponPercentageRulesController : ControllerBase
         }
     }
 
-    private static bool IsValidPercentage(decimal percentage)
-    {
-        return percentage >= 0 && percentage <= 100;
-    }
+    private static bool IsValidPercentage(decimal percentage) =>
+        percentage >= 0 && percentage <= 100;
 }
 
 public class CouponPercentageRuleRequest
 {
     public string AirlineName { get; set; } = string.Empty;
-
     public string CabinClass { get; set; } = string.Empty;
-
     public decimal Percentage { get; set; }
-
     public bool IsActive { get; set; } = true;
 }
 
 public class CouponCalculationRequest
 {
     public decimal BookingFare { get; set; }
-
     public string AirlineName { get; set; } = string.Empty;
-
     public string CabinClass { get; set; } = string.Empty;
 }
