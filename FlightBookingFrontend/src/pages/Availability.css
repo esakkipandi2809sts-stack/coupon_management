@@ -191,7 +191,7 @@
   align-items: end;
   gap: 13px;
   margin-top: 20px;
-  padding-top: 18px;  
+  padding-top: 18px;
 }
 
 .availability-special-fares {
@@ -630,12 +630,10 @@
   scrollbar-color: #94a3b8 #f1f5f9;
 }
 
-/* Keep flight rows wide enough to scroll horizontally */
 .ac-list-scroll .ac-list {
   min-width: 850px;
 }
 
-/* Keep scrollbar visible and usable in Chrome/Edge */
 .ac-list-scroll::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -649,6 +647,7 @@
 .ac-list-scroll::-webkit-scrollbar-thumb {
   background: #94a3b8;
   border-radius: 8px;
+  border: 2px solid #f1f5f9;
 }
 
 .ac-list-scroll::-webkit-scrollbar-thumb:hover {
@@ -734,26 +733,6 @@
 }
 
 
-
-.ac-list-scroll::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.ac-list-scroll::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 8px;
-}
-
-.ac-list-scroll::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 8px;
-  border: 2px solid #f1f5f9;
-}
-
-.ac-list-scroll::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
 
 
 
