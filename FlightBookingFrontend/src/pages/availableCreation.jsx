@@ -587,26 +587,7 @@ function SegmentForm({
           />
         </Field>
 
-        <div className="ac-fare" aria-live="polite">
-          <span className="ac-fare-label">
-            {tripType === 'RoundTrip' && index === 1
-              ? 'Return Flight Fare'
-              : 'Flight Fare'}
-          </span>
 
-          {fare === null ? (
-            <span className="ac-fare-empty">
-              Select Flying From and Flying To to see the fare.
-            </span>
-          ) : (
-            <>
-              <span className="ac-fare-value">{formatINR(fare)}</span>
-              <span className="ac-hint">
-                Economy · ₹10 per km, minimum ₹1,500
-              </span>
-            </>
-          )}
-        </div>
       </div>
     </section>
   );
@@ -1317,7 +1298,6 @@ export default function AvailableCreation() {
                   <th>Travel Place</th>
                   <th>Booking Date</th>
                   <th>Departure Date</th>
-                  <th>Departure Time</th>
                   <th>Price</th>
                   <th>Status</th>
                   <th>Trip Type</th>
