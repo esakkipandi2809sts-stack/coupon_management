@@ -42,7 +42,7 @@ export default function BookingTable({ bookings = [], onView, onCancel, onResche
       <table style={{ width: '100%', minWidth: '1120px', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'center' }}>
         <thead style={{ backgroundColor: '#f8fafc', position: 'sticky', top: 0, zIndex: 2 }}>
           <tr>
-            {['Booking ID', 'Flight & Airline', 'Route', 'Departure', 'Passenger', 'Seat & Class', 'Amount', 'Status', 'Actions'].map((heading) => (
+            {['Booking ID', 'Booking Date', 'Flight & Airline', 'Route', 'Departure', 'Passenger', 'Seat & Class', 'Amount', 'Status', 'Actions'].map((heading) => (
               <th key={heading} scope="col" style={{ padding: '14px 18px', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 800, whiteSpace: 'nowrap' }}>{heading}</th>
             ))}
           </tr>
@@ -51,8 +51,11 @@ export default function BookingTable({ bookings = [], onView, onCancel, onResche
           {bookings.map((b) => (
             <tr key={b.bookingId} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s ease' }}>
               {/* Reference */}
-              <td style={{ padding: '16px 18px', fontWeight: 700, color: '#0284c7', fontFamily: 'var(--font-mono)',whiteSpace:'nowrap' }}>{b.bookingReference || '—'}</td>
-
+              <td style={{ padding: '16px 18px', fontWeight: 700, color: '#0284c7', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{b.bookingReference || '—'}</td>
+              
+              <td style={{ padding: '16px 18px' }}>
+                <div style={{ fontWeight: 600, color: '#0f172a' }}>{b.bookingDate ? String(b.bookingDate).slice(0, 10) : '—'}</div>
+              </td>
               {/* Flight & Airline */}
               <td style={{ padding: '16px 18px' }}>
                 <div style={{ fontWeight: 600, color: '#0f172a' }}>{b.flightNumber || '—'}</div>
