@@ -199,7 +199,7 @@
   min-width: 320px;
 }
 
-.availability-additional > .availability-field {
+.availability-additional>.availability-field {
   flex: 1 1 200px;
   max-width: 320px;
 }
@@ -535,11 +535,28 @@
   font-weight: 600;
 }
 
+.add-btn{
+      display: flex;
+    justify-content: end;
+}
+.add-passenger-btn{
+  padding: 5px 10px;
+    border-radius: 10px;
+    border: 2px solid;
+}
+.remove-passenger-btn {
+  padding: 5px 10px;
+  border-radius: 10px;
+  border: 2px solid;
+}
+
 .cabin-options {
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
+
+
 
 .cabin-option {
   display: flex;

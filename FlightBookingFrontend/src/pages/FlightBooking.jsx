@@ -442,7 +442,7 @@ export default function FlightBooking() {
                           type="text"
                           value={passenger.name}
                           onChange={(e) => updatePassenger(index, 'name', e.target.value)}
-                          placeholder="As shown on passport or government ID"
+                          placeholder="Passenger Name"
                           style={{
                             width: '100%', boxSizing: 'border-box', padding: '11px 16px 11px 42px', borderRadius: '12px',
                             border: `1px solid ${err.name ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem', outline: 'none'
@@ -464,7 +464,7 @@ export default function FlightBooking() {
                             type="email"
                             value={passenger.email}
                             onChange={(e) => updatePassenger(index, 'email', e.target.value)}
-                            placeholder="Ticket will be sent here"
+                            placeholder="Enter your E-mail"
                             style={{
                               width: '100%', boxSizing: 'border-box', padding: '11px 16px 11px 42px', borderRadius: '12px',
                               border: `1px solid ${err.email ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem', outline: 'none'
@@ -503,6 +503,7 @@ export default function FlightBooking() {
                         </label>
                         <input
                           type="number" min="1" max="120"
+                          placeholder="Enter your Age"
                           value={passenger.age}
                           onChange={(e) => updatePassenger(index, 'age', e.target.value)}
                           style={{
@@ -590,12 +591,14 @@ export default function FlightBooking() {
               })}
 
               {passengers.length < passengerCount && (
+                <div className="add-btn">
                 <button type="button" onClick={addPassenger} className="add-passenger-btn">
                   <span>+</span> Add Passenger
                 </button>
+                </div>
               )}
 
-              <p>
+              <p> 
                 Passenger details added: {passengers.length} / {passengerCount}
               </p>
 
