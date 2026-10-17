@@ -196,6 +196,12 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
           <ShieldCheck size={14} />
           Regular Fare
         </span>
+        {flight.bookingDate && (
+          <span className="flight-ticket-meta" title="Booking Date">
+            <CalendarDays size={14} />
+            Booking: {formatDate(flight.bookingDate)}
+          </span>
+        )}
         <button
           type="button"
           className="flight-ticket-link"
@@ -222,6 +228,9 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
         <div className="flight-ticket-expanded">
           <div><span>Airline</span><strong>{flight.airline}</strong></div>
           <div><span>Flight number</span><strong>{flight.flightNumber}</strong></div>
+          {flight.bookingDate && (
+            <div><span>Booking Date</span><strong>{formatDate(flight.bookingDate)}</strong></div>
+          )}
           <div><span>Departure</span><strong>{departureLocation} · {formatTime(flight.departureTime)}</strong></div>
           <div><span>Arrival</span><strong>{arrivalLocation} · {formatTime(flight.arrivalTime)}</strong></div>
           <div><span>Duration</span><strong>{schedule.duration}</strong></div>

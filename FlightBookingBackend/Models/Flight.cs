@@ -37,6 +37,9 @@ namespace FlightBookingBackend.Models
         public int? StopCount { get; set; }
 
         [Column(TypeName = "date")]
+        public DateOnly? BookingDate { get; set; }
+
+        [Column(TypeName = "date")]
         public DateOnly DepartureDate { get; set; }
 
         [Required]

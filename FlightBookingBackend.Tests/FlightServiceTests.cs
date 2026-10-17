@@ -405,6 +405,60 @@ public class FlightServiceTests
         Assert.Equal(0m, Assert.Single(flights).Price);
     }
 
+    [Fact]
+    public async Task CreateAndRetrieveFlightStoresAndReturnsBookingDateSeparatelyFromDepartureDate()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<FlightBookingDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var context = new FlightBookingDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+
+        var service = new FlightService(context);
+        var bookingDate = new DateOnly(2026, 10, 17);
+        var departureDate = new DateOnly(2026, 10, 25);
+
+        var createDto = new CreateFlightDto
+        {
+            FlightNumber = "BK-2026",
+            Airline = "SkyWings",
+            FromCity = "Chennai",
+            ToCity = "Mumbai",
+            BookingDate = bookingDate,
+            DepartureDate = departureDate,
+            DepartureTime = "09:00",
+            ArrivalDate = departureDate,
+            ArrivalTime = "11:00",
+            Duration = "2h",
+            DistanceKm = 1030m,
+            TotalSeats = 150,
+            AvailableSeats = 150,
+            Status = "Scheduled"
+        };
+
+        var created = await service.CreateFlightAsync(createDto, "admin@example.com");
+        Assert.NotNull(created);
+        Assert.Equal(bookingDate, created.BookingDate);
+        Assert.Equal(departureDate, created.DepartureDate);
+        Assert.NotEqual(created.BookingDate, created.DepartureDate);
+
+        var retrieved = await service.GetFlightByIdAsync(created.FlightId);
+        Assert.NotNull(retrieved);
+        Assert.Equal(bookingDate, retrieved.BookingDate);
+        Assert.Equal(departureDate, retrieved.DepartureDate);
+
+        // Test update flight booking date
+        var newBookingDate = new DateOnly(2026, 10, 18);
+        createDto.BookingDate = newBookingDate;
+        var updated = await service.UpdateFlightAsync(created.FlightId, createDto);
+        Assert.NotNull(updated);
+        Assert.Equal(newBookingDate, updated.BookingDate);
+        Assert.Equal(departureDate, updated.DepartureDate);
+    }
+
     private static Flight CreateFlight(string flightNumber) => new()
     {
         FlightNumber = flightNumber,

@@ -134,6 +134,9 @@ IF OBJECT_ID(N'dbo.Flights', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Flights', N'
     ALTER TABLE dbo.Flights ADD ToAirportCode VARCHAR(3) NULL;
 IF OBJECT_ID(N'dbo.Flights', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Flights', N'StopCount') IS NULL
     ALTER TABLE dbo.Flights ADD StopCount INT NULL;
+IF OBJECT_ID(N'dbo.Flights', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Flights', N'BookingDate') IS NULL
+    ALTER TABLE dbo.Flights ADD BookingDate DATE NULL
+        CONSTRAINT DF_Flights_BookingDate DEFAULT CAST(GETDATE() AS DATE) WITH VALUES;
 ");
 
             context.Database.ExecuteSqlRaw(@"

@@ -12,6 +12,7 @@ namespace FlightBookingBackend.DTOs
         public string? FromAirportCode { get; set; }
         public string? ToAirportCode { get; set; }
         public int? StopCount { get; set; }
+        public DateOnly? BookingDate { get; set; }
         public DateOnly DepartureDate { get; set; }
         public string DepartureTime { get; set; } = string.Empty;
         public DateOnly ArrivalDate { get; set; }
@@ -32,6 +33,7 @@ namespace FlightBookingBackend.DTOs
     {
         public string? FromCity { get; set; }
         public string? ToCity { get; set; }
+        public DateOnly? BookingDate { get; set; }
         public DateOnly? DepartureDate { get; set; }
         public DateOnly? ReturnDate { get; set; }
         public int Passengers { get; set; } = 1;
@@ -73,6 +75,7 @@ namespace FlightBookingBackend.DTOs
         public string? ToAirportCode { get; set; }
         [Range(0, 99)]
         public int? StopCount { get; set; }
+        public DateOnly? BookingDate { get; set; }
         public DateOnly DepartureDate { get; set; }
         [Required, StringLength(10, MinimumLength = 1)]
         public string DepartureTime { get; set; } = string.Empty;
