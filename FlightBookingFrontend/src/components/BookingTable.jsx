@@ -82,41 +82,13 @@ export default function BookingTable({
   onView,
   onCancel,
   onReschedule,
-  onDownload,
-  selectedStatus = 'All',
+  onDownload,  
   onStatusFilter,
 }) {
   return (
     <div style={{ width: '100%' }}>
       {/* Clickable status filters - single horizontal row */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          flexWrap: 'nowrap',
-          overflowX: 'auto',
-          paddingBottom: '12px',
-          marginBottom: '4px',
-        }}
-      >
-        {['All', ...STATUS_OPTIONS].map((status) => {
-          const active =
-            normalizeStatus(selectedStatus) === normalizeStatus(status);
 
-          return (
-            <button
-              key={status}
-              type="button"
-              onClick={() => onStatusFilter?.(status)}
-              aria-pressed={active}
-              style={buttonStyle(active)}
-            >
-              {status}
-            </button>
-          );
-        })}
-      </div>
 
       {!bookings.length ? (
         <div
