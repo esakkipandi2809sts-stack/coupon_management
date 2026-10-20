@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
@@ -19,18 +20,23 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { authUtil } from './utils/auth';
 
 function RoleDashboardRedirect() {
-  return <Navigate to={authUtil.isAdmin() ? '/admin-dashboard' : '/user-dashboard'} replace />;
+  return (
+    <Navigate
+      to={authUtil.isAdmin() ? '/admin-dashboard' : '/user-dashboard'}
+      replace
+    />
+  );
 }
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Authentication Routes */}
+        {/* Public Routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* Protected Application Routes inside Master Layout */}
+        {/* Application Routes - Login Required */}
         <Route
           path="/"
           element={
@@ -39,8 +45,11 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<RoleDashboardRedirect />} />
+          {/* Root opens login when accessed without authentication */}
+          <Route index element={<Navigate to="/login" replace />} />
+
           <Route path="dashboard" element={<RoleDashboardRedirect />} />
+
           <Route
             path="admin-dashboard"
             element={
@@ -49,6 +58,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="user-dashboard"
             element={
@@ -57,6 +67,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
           <Route path="availability" element={<Availability />} />
           <Route path="booking" element={<FlightBooking />} />
           <Route path="ticket-booking" element={<FlightBooking />} />
@@ -64,6 +75,7 @@ export default function App() {
           <Route path="my-bookings" element={<MyBookings />} />
           <Route path="coupons" element={<Coupons />} />
           <Route path="profile" element={<Profile />} />
+
           <Route
             path="availableCreation"
             element={
@@ -74,8 +86,8 @@ export default function App() {
           />
         </Route>
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {/* Unknown URL */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
   );
