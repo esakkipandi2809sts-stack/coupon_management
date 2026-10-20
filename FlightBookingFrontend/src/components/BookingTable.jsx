@@ -323,9 +323,6 @@ export default function BookingTable({
                               className={`badge ${STATUS_BADGES[option]}`}
                               style={{
                                 padding: '5px 8px',
-                                border: active
-                                  ? '2px solid #0284c7'
-                                  : '1px solid transparent',
                                 borderRadius: '6px',
                                 whiteSpace: 'nowrap',
                                 fontSize: '0.68rem',
