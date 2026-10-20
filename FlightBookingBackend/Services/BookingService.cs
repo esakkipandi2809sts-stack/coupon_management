@@ -540,10 +540,10 @@ namespace FlightBookingBackend.Services
             booking.BookingStatus = BookingStatuses.Cancelled;
             booking.PaymentStatus = "Refunded";
 
-            // Restore available seat on flight
+            // Restore available seats on flight based on passenger count
             if (booking.Flight != null)
             {
-                booking.Flight.AvailableSeats += 1;
+                booking.Flight.AvailableSeats += booking.PassengerCount;
             }
 
             var earnedCoupon = await _context.Coupons
@@ -664,8 +664,8 @@ namespace FlightBookingBackend.Services
             }
 
             // Move the seat from the old flight to the new one. The fare is unchanged because the route is the same.
-            currentFlight.AvailableSeats += 1;
-            newFlight.AvailableSeats -= 1;
+            currentFlight.AvailableSeats += booking.PassengerCount;
+            newFlight.AvailableSeats -= booking.PassengerCount;
 
             booking.Flight = newFlight;
             booking.FlightId = newFlight.FlightId;

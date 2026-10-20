@@ -121,13 +121,27 @@ input, select, textarea {
   border: 1px solid #fde68a;
 }
 
+/* New badge for Rescheduled - blue */
+.badge-rescheduled {
+  background-color: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+/* Updated badge for Failed - orange */
+.badge-failed {
+  background-color: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+}
+
 .badge-used {
   background-color: #eff6ff;
   color: #2563eb;
   border: 1px solid #bfdbfe;
 }
 
-.badge-expired, .badge-cancelled, .badge-inactive, .badge-failed {
+.badge-expired, .badge-cancelled, .badge-inactive {
   background-color: #fef2f2;
   color: #dc2626;
   border: 1px solid #fecaca;

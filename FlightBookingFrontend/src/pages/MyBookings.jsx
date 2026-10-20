@@ -26,6 +26,9 @@ const STATUS_FILTERS = [
   'Failed',
 ];
 
+// Helper to normalize status strings for comparison
+const normalizeStatus = (status) => String(status ?? '').trim().toLowerCase();
+
 const todayIso = () => {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
@@ -264,10 +267,10 @@ export default function MyBookings() {
   };
 
   const filteredBookings = bookings.filter((booking) => {
-    if (
-      statusFilter !== 'All' &&
-      booking.bookingStatus !== statusFilter
-    ) {
+    const filterNorm = normalizeStatus(statusFilter);
+    const bookingNorm = normalizeStatus(booking.bookingStatus);
+
+    if (filterNorm !== 'all' && bookingNorm !== filterNorm) {
       return false;
     }
 
@@ -275,27 +278,14 @@ export default function MyBookings() {
 
     const term = searchTerm.toLowerCase();
 
-    const matchRef = booking.bookingReference
-      ?.toLowerCase()
-      .includes(term);
-
-    const matchPassenger = booking.passengerName
-      ?.toLowerCase()
-      .includes(term);
-
-    const matchRoute = `${booking.fromCity ?? ''} ${
-      booking.toCity ?? ''
-    }`
+    const matchRef = booking.bookingReference?.toLowerCase().includes(term);
+    const matchPassenger = booking.passengerName?.toLowerCase().includes(term);
+    const matchRoute = `${booking.fromCity ?? ''} ${booking.toCity ?? ''}`
       .toLowerCase()
       .includes(term);
+    const matchFlight = booking.flightNumber?.toLowerCase().includes(term);
 
-    const matchFlight = booking.flightNumber
-      ?.toLowerCase()
-      .includes(term);
-
-    return Boolean(
-      matchRef || matchPassenger || matchRoute || matchFlight
-    );
+    return Boolean(matchRef || matchPassenger || matchRoute || matchFlight);
   });
 
   return (
