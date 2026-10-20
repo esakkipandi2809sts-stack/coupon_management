@@ -1340,8 +1340,8 @@ export default function AvailableCreation() {
 
                     <td>{describeFlight(flight)}</td>
 
-                    <td>
-                      {flight.createdByUserName || 'Unknown'}
+                    <td style={{textAlign:'center'}}>
+                      {flight.createdByUserName || '-'}
                     </td>
 
                     {isAdmin && (
