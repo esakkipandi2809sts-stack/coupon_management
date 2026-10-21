@@ -296,9 +296,6 @@ namespace FlightBookingBackend.Services
                         throw new ArgumentException($"{label}: route distance could not be determined for this route.");
                     }
 
-                    var localNow = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), _businessTimeZone);
-                    var today = DateOnly.FromDateTime(localNow.DateTime);
-
                     var flight = new Flight
                     {
                         FlightNumber = flightNumber,
@@ -308,7 +305,6 @@ namespace FlightBookingBackend.Services
                         FromAirportCode = NormalizeAirportCode(dto.FromAirportCode),
                         ToAirportCode = NormalizeAirportCode(dto.ToAirportCode),
                         StopCount = dto.StopCount,
-                        BookingDate = dto.BookingDate ?? today,
                         DepartureDate = dto.DepartureDate,
                         DepartureTime = departureTime,
                         ArrivalDate = dto.ArrivalDate,
@@ -393,10 +389,6 @@ namespace FlightBookingBackend.Services
             flight.FromAirportCode = NormalizeAirportCode(dto.FromAirportCode);
             flight.ToAirportCode = NormalizeAirportCode(dto.ToAirportCode);
             flight.StopCount = dto.StopCount;
-            if (dto.BookingDate.HasValue)
-            {
-                flight.BookingDate = dto.BookingDate.Value;
-            }
             flight.DistanceKm = dto.DistanceKm;
             flight.DepartureDate = dto.DepartureDate;
             flight.DepartureTime = departureTime;
@@ -424,7 +416,6 @@ namespace FlightBookingBackend.Services
             FromAirportCode = f.FromAirportCode,
             ToAirportCode = f.ToAirportCode,
             StopCount = f.StopCount,
-            BookingDate = f.BookingDate,
             DepartureDate = f.DepartureDate,
             DepartureTime = f.DepartureTime,
             ArrivalDate = f.ArrivalDate,
