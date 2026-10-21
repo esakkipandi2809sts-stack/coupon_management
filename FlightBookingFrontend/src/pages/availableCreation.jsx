@@ -556,37 +556,6 @@ function SegmentForm({
           />
         </Field>
 
-        <Field
-          id={fieldId('totalSeats')}
-          label="Total Seats"
-          icon={Users}
-          error={err('totalSeats')}
-        >
-          <input
-            {...input('totalSeats', {
-              type: 'number',
-              min: 1,
-              placeholder: 'e.g. 180',
-            })}
-          />
-        </Field>
-
-        <Field
-          id={fieldId('availableSeats')}
-          label="Available Seats"
-          icon={Users}
-          error={err('availableSeats')}
-        >
-          <input
-            {...input('availableSeats', {
-              type: 'number',
-              min: 0,
-              max: segment.totalSeats || undefined,
-              placeholder: 'e.g. 120',
-            })}
-          />
-        </Field>
-
 
       </div>
     </section>
