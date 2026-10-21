@@ -52,7 +52,7 @@ const TRIP_LABELS = {
 
 const MIN_MULTI_CITY_SEGMENTS = 2;
 const MAX_MULTI_CITY_SEGMENTS = 6;
-const SUCCESS_MESSAGE = 'Your flight creation was successful!';
+const SUCCESS_MESSAGE = 'Your flight creation was successful !';
 
 const pad = (value) => String(value).padStart(2, '0');
 
@@ -1068,14 +1068,7 @@ export default function AvailableCreation() {
 
       {createdSummary && (
         <div className="ac-summary" role="status">
-          <h3>
-            {TRIP_LABELS[createdSummary.tripType]} created ·{' '}
-            {createdSummary.flights.length}{' '}
-            {createdSummary.flights.length === 1
-              ? 'flight'
-              : 'flights'}{' '}
-            saved
-          </h3>
+          <h3>{TRIP_LABELS[createdSummary.tripType]} is created : </h3>
 
           <ul>
             {createdSummary.flights.map((flight) => (
@@ -1088,7 +1081,7 @@ export default function AvailableCreation() {
                 </span>
                
                 <span>
-                  {flight.departureDate} {flight.departureTime}
+                  {flight.departureDate} - {flight.departureTime}
                 </span>
                 <span>{formatINR(flight.price)}</span>
               </li>
