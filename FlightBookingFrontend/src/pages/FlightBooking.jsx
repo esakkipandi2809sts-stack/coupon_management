@@ -1,11 +1,10 @@
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Plane,
   Clock,
   User,
-  Mail,
-  Phone,
   Tag,
   CheckCircle,
   AlertCircle,
@@ -14,181 +13,416 @@ import {
   ChevronRight,
   ArrowRight
 } from 'lucide-react';
+
 import { bookingApi, couponApi } from '../services/api';
 import { authUtil } from '../utils/auth';
-import { calculateClassFare, formatINR, getClassMultiplier } from '../utils/flightPricing';
+import { calculateClassFare, formatINR } from '../utils/flightPricing';
+
+const EMPTY_PASSENGER = {
+  name: '',
+  email: '',
+  phone: '',
+  age: '',
+  gender: '',
+  seat: ''
+};
+
+const SAMPLE_SEATS = [
+  '11A', '11B', '12A', '12B',
+  '13A', '13B', '14A', '14B',
+  '15A', '15B', '16C', '16D',
+  '17C', '17D', '18C', '18D',
+  '19C', '19D', '20C', '20D'
+];
+
+const PAYMENT_METHODS = [
+  'Credit Card',
+  'Debit Card',
+  'UPI / NetBanking'
+];
+
+const styles = {
+  card: {
+    background: '#fff',
+    border: '1px solid #e2e8f0',
+    borderRadius: 18,
+    padding: 24,
+    boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
+    minWidth: 0
+  },
+  label: {
+    display: 'block',
+    fontSize: '0.85rem',
+    fontWeight: 600,
+    color: '#334155',
+    marginBottom: 6
+  },
+  input: {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '11px 12px',
+    borderRadius: 10,
+    border: '1px solid #cbd5e1',
+    fontSize: '0.9rem',
+    outline: 'none',
+    background: '#fff'
+  },
+  primaryButton: {
+    width: '100%',
+    padding: 13,
+    border: 0,
+    borderRadius: 12,
+    background: '#0284c7',
+    color: '#fff',
+    fontWeight: 700,
+    fontSize: '0.95rem',
+    cursor: 'pointer'
+  },
+  error: {
+    padding: 12,
+    background: '#fef2f2',
+    color: '#b91c1c',
+    border: '1px solid #fecaca',
+    borderRadius: 10,
+    fontSize: '0.85rem'
+  }
+};
+
+function FormField({
+  label,
+  value,
+  onChange,
+  error,
+  type = 'text',
+  placeholder = '',
+  min,
+  max,
+  options
+}) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <label style={styles.label}>{label}</label>
+
+      {options ? (
+        <select
+          value={value}
+          onChange={onChange}
+          style={{
+            ...styles.input,
+            borderColor: error ? '#ef4444' : '#cbd5e1'
+          }}
+        >
+          <option value="">Select {label.replace(' *', '')}</option>
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          min={min}
+          max={max}
+          style={{
+            ...styles.input,
+            borderColor: error ? '#ef4444' : '#cbd5e1'
+          }}
+        />
+      )}
+
+      {error && (
+        <p style={{ color: '#dc2626', fontSize: '0.75rem', margin: '4px 0 0' }}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function FlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
 
   const user = authUtil.getUser();
-  const initialFlight = location.state?.flight;
-  const initialCouponCode = location.state?.couponCode || '';
+  const flight = location.state?.flight || null;
   const selectedClass = location.state?.selectedClass || 'Economy';
-  const passengerCount = Math.min(27, Math.max(1, Number(location.state?.passengerCount) || 1));
 
-  const flight = initialFlight || null;
+  const passengerCount = Math.min(
+    27,
+    Math.max(1, Number(location.state?.passengerCount) || 1)
+  );
 
-  // Form State
-  const [passengerName, setPassengerName] = useState(user?.fullName || '');
-  const [passengerEmail, setPassengerEmail] = useState(user?.email || '');
-  const [passengerPhone, setPassengerPhone] = useState(user?.phoneNumber || '');
-  const [passengerAge, setPassengerAge] = useState();
-  const [passengerGender, setPassengerGender] = useState('Male');
-  const [seatNumber, setSeatNumber] = useState('14B');
+  const initialCouponCode = location.state?.couponCode || '';
+
+  const [passengers, setPassengers] = useState(() => [
+    {
+      ...EMPTY_PASSENGER,
+      name: user?.fullName || '',
+      email: user?.email || '',
+      phone: user?.phoneNumber || ''
+    }
+  ]);
+
   const [paymentMethod, setPaymentMethod] = useState('Credit Card');
 
-  // Coupon State
   const [couponCode, setCouponCode] = useState(initialCouponCode);
-  const [couponLoading, setCouponLoading] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
+
   const [passengerCoupons, setPassengerCoupons] = useState([]);
   const [couponsLoading, setCouponsLoading] = useState(true);
   const [couponsError, setCouponsError] = useState('');
+
   const [couponBalance, setCouponBalance] = useState(null);
   const [couponBalanceError, setCouponBalanceError] = useState('');
   const [redeemCouponPoints, setRedeemCouponPoints] = useState(false);
 
-  // Booking State
-  const [submitting, setSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
   const [bookingError, setBookingError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
   const submittingRef = useRef(false);
   const bookingRequestKeyRef = useRef(null);
+
   if (!bookingRequestKeyRef.current) {
-    bookingRequestKeyRef.current = crypto.randomUUID();
+    bookingRequestKeyRef.current =
+      typeof crypto !== 'undefined' &&
+        typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `booking-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 
-  const [passengers, setPassengers] = useState([
-    {
-      name: '',
-      email: '',
-      phone: '',
-      age: '',
-      gender: '',
-      seat: '',
-    },
-  ]);
-
-  const addPassenger = () => {
-    if (passengers.length >= passengerCount) return;
-
-    setPassengers((prev) => [
-      ...prev,
-      {
-        name: '',
-        email: '',
-        phone: '',
-        age: '',
-        gender: '',
-        seat: '',
-      },
-    ]);
-  };
-
-  const removePassenger = (index) => {
-    setPassengers((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const updatePassenger = (index, field, value) => {
-    setPassengers((prev) =>
-      prev.map((passenger, i) =>
-        i === index ? { ...passenger, [field]: value } : passenger
-      )
-    );
-  };
-  // Form validation errors
-  const [formErrors, setFormErrors] = useState({});
-
   const loadPassengerCoupons = useCallback(async () => {
-    setCouponsError('');
     try {
+      setCouponsError('');
       const response = await couponApi.getAvailable();
-      setPassengerCoupons(response.data);
+
+      setPassengerCoupons(
+        Array.isArray(response.data) ? response.data : []
+      );
     } catch (err) {
-      setCouponsError(err.response?.data?.message || 'Unable to load your coupons.');
+      setCouponsError(
+        err.response?.data?.message || 'Unable to load available coupons.'
+      );
     } finally {
       setCouponsLoading(false);
     }
   }, []);
 
   const loadCouponBalance = useCallback(async () => {
-    setCouponBalanceError('');
     try {
+      setCouponBalanceError('');
+
       const response = await couponApi.getBalance();
       setCouponBalance(response.data);
     } catch (err) {
-      setCouponBalanceError(err.response?.data?.message || 'Unable to load your coupon point balance.');
+      setCouponBalanceError(
+        err.response?.data?.message ||
+        'Unable to load your coupon point balance.'
+      );
     }
   }, []);
 
   useEffect(() => {
     loadPassengerCoupons();
     loadCouponBalance();
-    const refreshInterval = window.setInterval(() => {
-      loadPassengerCoupons();
-      loadCouponBalance();
-    }, 30000);
-    const refreshOnFocus = () => {
-      loadPassengerCoupons();
-      loadCouponBalance();
-    };
-    window.addEventListener('focus', refreshOnFocus);
+  }, [loadPassengerCoupons, loadCouponBalance]);
 
-    return () => {
-      window.clearInterval(refreshInterval);
-      window.removeEventListener('focus', refreshOnFocus);
-    };
-  }, [loadCouponBalance, loadPassengerCoupons]);
-
-  if (!flight) {
-    return (
-      <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-        <Plane size={48} color="#0284c7" style={{ margin: '0 auto 16px' }} />
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>No flight selected</h2>
-        <p style={{ color: '#64748b', margin: '8px 0 20px' }}>
-          Search for a flight and select one before continuing to booking.
-        </p>
-        <button
-          type="button"
-          onClick={() => navigate('/availability')}
-          style={{
-            padding: '11px 20px',
-            borderRadius: '10px',
-            backgroundColor: '#0284c7',
-            color: '#ffffff',
-            fontWeight: 700
-          }}
-        >
-          Search Flights
-        </button>
-      </div>
+  const updatePassenger = (index, field, value) => {
+    setPassengers((previous) =>
+      previous.map((passenger, i) =>
+        i === index
+          ? { ...passenger, [field]: value }
+          : passenger
+      )
     );
-  }
 
-  // Calculate pricing breakdown
-  const baseFarePerPassenger = Math.round(Number(flight.price) || 0);
-  const classFarePerPassenger = calculateClassFare(baseFarePerPassenger, selectedClass);
-  const originalFare = classFarePerPassenger === null ? NaN : Math.round(classFarePerPassenger * passengerCount);
-  const fareAvailable = Number.isFinite(originalFare) && originalFare > 0;
+    setFormErrors((previous) => {
+      const next = { ...previous };
+
+      if (next[index]) {
+        next[index] = { ...next[index] };
+        delete next[index][field];
+      }
+
+      return next;
+    });
+  };
+
+  const addPassenger = () => {
+    if (passengers.length >= passengerCount) return;
+
+    setPassengers((previous) => [
+      ...previous,
+      { ...EMPTY_PASSENGER }
+    ]);
+  };
+
+  const removePassenger = (index) => {
+    setPassengers((previous) =>
+      previous.filter((_, i) => i !== index)
+    );
+
+    setFormErrors((previous) => {
+      const next = {};
+
+      Object.keys(previous).forEach((key) => {
+        const oldIndex = Number(key);
+
+        if (oldIndex < index) {
+          next[oldIndex] = previous[oldIndex];
+        } else if (oldIndex > index) {
+          next[oldIndex - 1] = previous[oldIndex];
+        }
+      });
+
+      return next;
+    });
+  };
+
+  const validatePassengers = () => {
+    const errors = {};
+
+    if (passengers.length !== passengerCount) {
+      setBookingError(
+        `Please add all ${passengerCount} passenger(s) before booking.`
+      );
+      return false;
+    }
+
+    passengers.forEach((passenger, index) => {
+      const err = {};
+
+      if (!passenger.name.trim()) {
+        err.name = 'Passenger name is required.';
+      }
+
+      if (
+        !passenger.email.trim() ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passenger.email.trim())
+      ) {
+        err.email = 'Enter a valid email address.';
+      }
+
+      if (!passenger.phone.trim()) {
+        err.phone = 'Phone number is required.';
+      } else if (
+        passenger.phone.replace(/\D/g, '').length < 7
+      ) {
+        err.phone = 'Enter a valid phone number.';
+      }
+
+      const age = Number(passenger.age);
+
+      if (
+        passenger.age === '' ||
+        !Number.isInteger(age) ||
+        age < 1 ||
+        age > 120
+      ) {
+        err.age = 'Enter a valid age between 1 and 120.';
+      }
+
+      if (!passenger.gender) {
+        err.gender = 'Select a gender.';
+      }
+
+      if (passenger.seat) {
+        const seat = passenger.seat.trim().toUpperCase();
+
+        const duplicateSeat = passengers.some(
+          (other, otherIndex) =>
+            otherIndex !== index &&
+            other.seat.trim().toUpperCase() === seat
+        );
+
+        if (duplicateSeat) {
+          err.seat = 'This seat is selected by another passenger.';
+        }
+      }
+
+      if (Object.keys(err).length > 0) {
+        errors[index] = err;
+      }
+    });
+
+    setFormErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      setBookingError('Please correct the passenger details.');
+      return false;
+    }
+
+    return true;
+  };
+
+  const baseFarePerPassenger = Math.round(Number(flight?.price) || 0);
+
+  const classFarePerPassenger = flight
+    ? calculateClassFare(baseFarePerPassenger, selectedClass)
+    : null;
+
+  const originalFare =
+    classFarePerPassenger !== null &&
+      Number.isFinite(classFarePerPassenger)
+      ? Math.round(classFarePerPassenger * passengerCount)
+      : NaN;
+
+  const fareAvailable =
+    Number.isFinite(originalFare) && originalFare > 0;
+
   const discountAmount = appliedCoupon
-    ? Math.round(Math.min(Number(appliedCoupon.discountAmount) || 0, originalFare))
+    ? Math.round(
+      Math.min(
+        Math.max(0, Number(appliedCoupon.discountAmount) || 0),
+        Number.isFinite(originalFare) ? originalFare : 0
+      )
+    )
     : 0;
-  const availableCouponPoints = Math.round(Number(couponBalance?.availablePoints) || 0);
-  const remainingFareAfterCoupon = Math.max(0, originalFare - discountAmount);
+
+  const availableCouponPoints = Math.max(
+    0,
+    Number(couponBalance?.availablePoints) || 0
+  );
+
+  const remainingFare = Math.max(0, (originalFare || 0) - discountAmount);
+
   const availablePointsDiscount = appliedCoupon
     ? 0
-    : Math.floor(Math.min(availableCouponPoints / 10, remainingFareAfterCoupon));
-  const pointsDiscountAmount = (redeemCouponPoints && !appliedCoupon) ? availablePointsDiscount : 0;
-  const totalAmount = Math.max(0, Math.round(originalFare - discountAmount - pointsDiscountAmount));
+    : Math.floor(
+      Math.min(availableCouponPoints / 10, remainingFare)
+    );
 
-  // Validate coupon via API
+  const pointsDiscountAmount =
+    redeemCouponPoints && !appliedCoupon
+      ? availablePointsDiscount
+      : 0;
+
+  const totalAmount = Math.max(
+    0,
+    Math.round(
+      (Number.isFinite(originalFare) ? originalFare : 0) -
+      discountAmount -
+      pointsDiscountAmount
+    )
+  );
+
   const handleApplyCoupon = async (codeToApply) => {
-    const code = (codeToApply || couponCode).trim().toUpperCase();
+    const code = (codeToApply ?? couponCode).trim().toUpperCase();
+
     if (!code) {
       setCouponError('Please enter a coupon code.');
+      return;
+    }
+
+    if (!flight?.flightId) {
+      setCouponError('Flight details are missing.');
       return;
     }
 
@@ -197,21 +431,33 @@ export default function FlightBooking() {
     setCouponSuccess('');
 
     try {
-      const response = await couponApi.validate(code, flight.flightId, selectedClass, passengerCount);
+      const response = await couponApi.validate(
+        code,
+        flight.flightId,
+        selectedClass,
+        passengerCount
+      );
+
       const data = response.data;
 
-      if (data.isValid) {
-        setAppliedCoupon(data);
+      if (data?.isValid) {
+        setAppliedCoupon({
+          ...data,
+          couponCode: data.couponCode || code
+        });
+
         setCouponCode(code);
-        setCouponSuccess(data.message);
+        setRedeemCouponPoints(false);
+        setCouponSuccess(data.message || 'Coupon applied successfully.');
       } else {
         setAppliedCoupon(null);
-        setCouponError(data.message || 'Invalid coupon.');
+        setCouponError(data?.message || 'This coupon is not valid.');
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to validate coupon.';
       setAppliedCoupon(null);
-      setCouponError(msg);
+      setCouponError(
+        err.response?.data?.message || 'Failed to validate coupon.'
+      );
     } finally {
       setCouponLoading(false);
     }
@@ -224,731 +470,860 @@ export default function FlightBooking() {
     setCouponError('');
   };
 
-  const validatePassengerDetails = () => {
-    const errs = {};
-    if (!passengerName.trim()) errs.passengerName = 'Passenger name is required';
-    if (!passengerEmail.trim()) errs.passengerEmail = 'Passenger email is required';
-    if (!passengerPhone.trim()) errs.passengerPhone = 'Passenger phone is required';
-    if (!passengerAge || passengerAge < 1 || passengerAge > 120) errs.passengerAge = 'Valid age is required';
-    if (!seatNumber.trim()) errs.seatNumber = 'Please choose a seat number';
+  const handleConfirmBooking = async (event) => {
+    event.preventDefault();
 
-    setFormErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
-
-  const handleConfirmBooking = async (e) => {
-    e.preventDefault();
     if (submittingRef.current) return;
+
     setBookingError('');
 
-    if (!fareAvailable) {
-      setBookingError('This flight has no route distance, so its fare cannot be calculated. Ask an administrator to update the flight.');
+    if (!flight?.flightId) {
+      setBookingError('Flight details are missing. Please select a flight again.');
       return;
     }
 
-    if (!validatePassengerDetails()) {
+    if (!fareAvailable) {
+      setBookingError('The fare is unavailable. Please select another flight or contact the administrator.');
+      return;
+    }
+
+    if (!validatePassengers()) {
       return;
     }
 
     submittingRef.current = true;
     setSubmitting(true);
+
     try {
+      const firstPassenger = passengers[0];
+
+      // Keep the first passenger's fields at the top level for
+      // compatibility with APIs that expect the existing booking DTO.
       const payload = {
         idempotencyKey: bookingRequestKeyRef.current,
+
         flightId: flight.flightId,
-        passengerName,
-        passengerEmail,
-        passengerPhone,
-        passengerAge: Number(passengerAge),
-        passengerGender,
-        seatNumber,
+
+        passengerName: firstPassenger.name.trim(),
+        passengerEmail: firstPassenger.email.trim(),
+        passengerPhone: firstPassenger.phone.trim(),
+        passengerAge: Number(firstPassenger.age),
+        passengerGender: firstPassenger.gender,
+        seatNumber: firstPassenger.seat.trim().toUpperCase(),
+
         class: selectedClass,
         passengerCount,
-        couponCode: appliedCoupon ? appliedCoupon.couponCode : undefined,
+        paymentMethod,
+
+        couponCode: appliedCoupon
+          ? appliedCoupon.couponCode
+          : undefined,
+
         redeemCouponPoints,
-        paymentMethod
+
+        // Your backend DTO must support this field for multi-passenger
+        // bookings to persist every passenger's information.
+        passengers: passengers.map((passenger) => ({
+          name: passenger.name.trim(),
+          email: passenger.email.trim(),
+          phone: passenger.phone.trim(),
+          age: Number(passenger.age),
+          gender: passenger.gender,
+          seat: passenger.seat.trim().toUpperCase()
+        }))
       };
 
+      console.log('Submitting booking:', payload);
+
       const response = await bookingApi.create(payload);
+
       const confirmedBooking = response.data;
-      await loadCouponBalance();
+
+      if (!confirmedBooking) {
+        throw new Error(
+          'The booking API returned no booking details.'
+        );
+      }
+
+      console.log('Booking successful:', confirmedBooking);
+
+      // Coupon refresh is separate from booking confirmation.
+      // A coupon API error must not prevent successful navigation.
       let couponPageData = null;
       let couponRefreshError = '';
+
       try {
-        const [couponsResponse, statisticsResponse] = await Promise.all([
-          couponApi.getAll(),
-          couponApi.getStatistics()
-        ]);
+        const [couponsResponse, statisticsResponse] =
+          await Promise.all([
+            couponApi.getAll(),
+            couponApi.getStatistics()
+          ]);
+
         couponPageData = {
           coupons: couponsResponse.data,
           statistics: statisticsResponse.data
         };
-      } catch (refreshError) {
-        couponRefreshError = refreshError.response?.data?.message ||
-          'Your booking succeeded, but coupon details could not be refreshed. Open Coupons and refresh to try again.';
+      } catch (err) {
+        couponRefreshError =
+          err.response?.data?.message ||
+          'Booking succeeded, but coupon details could not be refreshed.';
       }
 
-      // Navigate to Booking Confirmation Ticket
+      try {
+        await loadCouponBalance();
+      } catch {
+        // Balance refresh must not block navigation.
+      }
+
       navigate('/booking-confirmation', {
-        state: { booking: confirmedBooking, couponPageData, couponRefreshError },
+        state: {
+          booking: confirmedBooking,
+          couponPageData,
+          couponRefreshError
+        },
         replace: true
       });
     } catch (err) {
-      const msg = err.response?.data?.message || 'Booking process failed. Please check seat availability or coupon validity.';
-      setBookingError(msg);
+      console.error('Booking error:', err);
+      console.error('Backend response:', err.response?.data);
+
+      setBookingError(
+        err.response?.data?.message ||
+        err.message ||
+        'Booking failed. Please try again.'
+      );
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
     }
   };
 
-  // Sample quick seats
-  const sampleSeats = ['11A', '11B', '12A', '12B', '13A', '13B', '14A', '14B', '15A', '15B', '16C', '16D', '17C', '17D', '18C', '18D', '19C', '19D', '20C', '20D'];
+  if (!flight) {
+    return (
+      <div style={{ textAlign: 'center', padding: 60 }}>
+        <Plane size={42} color="#0284c7" />
+        <h2>No flight selected</h2>
+        <p>Please search for a flight before booking.</p>
+        <button
+          type="button"
+          style={styles.primaryButton}
+          onClick={() => navigate('/availability')}
+        >
+          Search Flights
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }} className="animate-fade-in">
-      {/* Breadcrumb & Header */}
+    <div
+      className="animate-fade-in"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 24,
+        color: '#0f172a'
+      }}
+    >
+      <style>{`
+        .booking-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+          gap: 24px;
+          align-items: start;
+        }
+
+        .booking-two-fields {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .booking-three-fields {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .booking-seat {
+          padding: 7px 10px;
+          border-radius: 7px;
+          border: 1px solid #cbd5e1;
+          background: #f8fafc;
+          cursor: pointer;
+          font-weight: 600;
+        }
+
+        .booking-seat:disabled {
+          opacity: 0.35;
+          cursor: not-allowed;
+        }
+
+        @media (max-width: 990px) {
+          .booking-grid {
+            grid-template-columns: minmax(0, 1fr);
+          }
+        }
+
+        @media (max-width: 600px) {
+          .booking-two-fields,
+          .booking-three-fields {
+            grid-template-columns: minmax(0, 1fr);
+          }
+        }
+      `}</style>
+
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#64748b', marginBottom: '6px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            color: '#64748b',
+            fontSize: '0.85rem',
+            marginBottom: 8
+          }}
+        >
           <span>Flights</span>
           <ChevronRight size={14} />
-          <span style={{ color: '#0284c7', fontWeight: 600 }}>Booking Checkout</span>
+          <span style={{ color: '#0284c7', fontWeight: 700 }}>
+            Booking Checkout
+          </span>
         </div>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+
+        <h1 style={{ fontSize: '1.7rem', fontWeight: 800, margin: 0 }}>
           Complete Flight Reservation
         </h1>
       </div>
 
       {bookingError && (
-        <div style={{ padding: '16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', color: '#dc2626', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <AlertCircle size={20} />
-          <span>{bookingError}</span>
+        <div role="alert" style={styles.error}>
+          <AlertCircle
+            size={18}
+            style={{ verticalAlign: 'middle', marginRight: 8 }}
+          />
+          {bookingError}
         </div>
       )}
 
-      {/* Main 2-Column Checkout Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '28px' }} className="booking-checkout-grid">
-        {/* Left Column: Flight Summary & Passenger Form */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Selected Flight Summary Card */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '20px',
-              border: '1px solid #e2e8f0',
-              padding: '24px',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.03)'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#f0f9ff', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Plane size={22} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{flight.airline}</h3>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'var(--font-mono)' }}>
-                    Flight #{flight.flightNumber}
-                  </span>
-                </div>
+      <div className="booking-grid">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Flight details */}
+          <section style={styles.card}>
+            <div
+              style={{
+                display: 'flex',
+                gap: 12,
+                alignItems: 'center',
+                marginBottom: 18
+              }}
+            >
+              <Plane size={28} color="#0284c7" />
+              <div>
+                <h2 style={{ fontSize: '1.1rem', margin: 0 }}>
+                  {flight.airline}
+                </h2>
+                <span style={{ color: '#64748b', fontSize: '0.82rem' }}>
+                  Flight #{flight.flightNumber}
+                </span>
               </div>
-
             </div>
 
-            {/* Flight Route Visual */}
             <div
               style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr auto 1fr',
                 alignItems: 'center',
-                gap: '16px',
-                padding: '16px',
-                backgroundColor: '#f8fafc',
-                borderRadius: '14px',
-                border: '1px solid #f1f5f9'
+                gap: 12,
+                padding: 16,
+                borderRadius: 12,
+                background: '#f8fafc'
               }}
             >
               <div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a' }}>{flight.departureTime}</div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>{flight.fromCity}</div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{flight.departureDate}</div>
+                <strong style={{ fontSize: '1.2rem' }}>
+                  {flight.departureTime}
+                </strong>
+                <div>{flight.fromCity}</div>
+                <small style={{ color: '#64748b' }}>
+                  {flight.departureDate}
+                </small>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '100px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#64748b' }}>
-                  <Clock size={12} />
-                  <span>{flight.duration}</span>
+              <div style={{ textAlign: 'center', color: '#64748b' }}>
+                <Clock size={15} />
+                <div style={{ fontSize: '0.8rem' }}>
+                  {flight.duration}
                 </div>
-                <div style={{ width: '80px', height: '2px', backgroundColor: '#cbd5e1', margin: '6px 0', position: 'relative' }}>
-                  <div style={{ position: 'absolute', left: '50%', top: '-8px', transform: 'translateX(-50%)', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Plane size={9} color="#ffffff" style={{ transform: 'rotate(45deg)' }} />
-                  </div>
+                <div style={{ marginTop: 6 }}>
+                  {flight.distanceKm
+                    ? `${flight.distanceKm} km`
+                    : 'Distance unavailable'}
                 </div>
-                <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>Direct Flight</span>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>
-                  {flight.distanceKm ? `${flight.distanceKm} km` : 'Distance unavailable'}
-                </span>
               </div>
 
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a' }}>{flight.arrivalTime}</div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>{flight.toCity}</div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{flight.arrivalDate}</div>
+                <strong style={{ fontSize: '1.2rem' }}>
+                  {flight.arrivalTime}
+                </strong>
+                <div>{flight.toCity}</div>
+                <small style={{ color: '#64748b' }}>
+                  {flight.arrivalDate}
+                </small>
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Passenger Information Form */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '20px',
-              border: '1px solid #e2e8f0',
-              padding: '28px',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.03)'
-            }}
-          >
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '20px' }}>
+          {/* Passenger form */}
+          <section style={styles.card}>
+            <h2 style={{ fontSize: '1.15rem', marginTop: 0 }}>
               Passenger Details
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            </h2>
 
+            <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
+              Add details for all {passengerCount} passenger(s).
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               {passengers.map((passenger, index) => {
-                const err = (formErrors && formErrors[index]) || {};
-                const takenSeats = passengers.map((p) => p.seat).filter(Boolean);
+                const errors = formErrors[index] || {};
+                const selectedSeat = passenger.seat.trim().toUpperCase();
 
                 return (
-                  <div className="passenger-card" key={index}
-                    style={{ border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', background: '#fff' }}>
+                  <div
+                    key={index}
+                    style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 12,
+                      padding: 16
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 16
+                      }}
+                    >
+                      <h3 style={{ margin: 0, fontSize: '1rem' }}>
+                        <User
+                          size={17}
+                          style={{ verticalAlign: 'middle', marginRight: 6 }}
+                        />
+                        Passenger {index + 1}
+                      </h3>
 
-                    <div className="passenger-header"
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                      <h4 style={{ margin: 0 }}>Passenger {index + 1}</h4>
                       {index > 0 && (
-                        <button type="button" onClick={() => removePassenger(index)} className="remove-passenger-btn">
+                        <button
+                          type="button"
+                          onClick={() => removePassenger(index)}
+                          style={{
+                            border: 0,
+                            background: 'transparent',
+                            color: '#dc2626',
+                            cursor: 'pointer'
+                          }}
+                        >
                           Remove
                         </button>
                       )}
                     </div>
 
-                    {/* Name */}
-                    <div style={{ marginBottom: '14px' }}>
-                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                        Passenger Full Name *
-                      </label>
-                      <div style={{ position: 'relative' }}>
-                        <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-                        <input
-                          type="text"
-                          value={passenger.name}
-                          onChange={(e) => updatePassenger(index, 'name', e.target.value)}
-                          placeholder="Passenger Name"
-                          style={{
-                            width: '100%', boxSizing: 'border-box', padding: '11px 16px 11px 42px', borderRadius: '12px',
-                            border: `1px solid ${err.name ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem', outline: 'none'
-                          }}
-                        />
-                      </div>
-                      {err.name && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.name}</span>}
+                    <div style={{ marginBottom: 14 }}>
+                      <FormField
+                        label="Full Name *"
+                        value={passenger.name}
+                        placeholder="Enter passenger name"
+                        error={errors.name}
+                        onChange={(e) =>
+                          updatePassenger(index, 'name', e.target.value)
+                        }
+                      />
                     </div>
 
-                    {/* Email & Phone */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '14px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                          Email Address *
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                          <Mail size={18} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-                          <input
-                            type="email"
-                            value={passenger.email}
-                            onChange={(e) => updatePassenger(index, 'email', e.target.value)}
-                            placeholder="Enter your E-mail"
-                            style={{
-                              width: '100%', boxSizing: 'border-box', padding: '11px 16px 11px 42px', borderRadius: '12px',
-                              border: `1px solid ${err.email ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem', outline: 'none'
-                            }}
-                          />
-                        </div>
-                        {err.email && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.email}</span>}
-                      </div>
+                    <div className="booking-two-fields" style={{ marginBottom: 14 }}>
+                      <FormField
+                        label="Email Address *"
+                        type="email"
+                        value={passenger.email}
+                        placeholder="Enter email"
+                        error={errors.email}
+                        onChange={(e) =>
+                          updatePassenger(index, 'email', e.target.value)
+                        }
+                      />
 
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                          Phone Number *
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                          <Phone size={18} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
-                          <input
-                            type="tel"
-                            value={passenger.phone}
-                            onChange={(e) => updatePassenger(index, 'phone', e.target.value)}
-                            placeholder="+91 98765 43210"
-                            style={{
-                              width: '100%', boxSizing: 'border-box', padding: '11px 16px 11px 42px', borderRadius: '12px',
-                              border: `1px solid ${err.phone ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem', outline: 'none'
-                            }}
-                          />
-                        </div>
-                        {err.phone && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.phone}</span>}
-                      </div>
+                      <FormField
+                        label="Phone Number *"
+                        type="tel"
+                        value={passenger.phone}
+                        placeholder="+91 98765 43210"
+                        error={errors.phone}
+                        onChange={(e) =>
+                          updatePassenger(index, 'phone', e.target.value)
+                        }
+                      />
                     </div>
 
-                    {/* Age, Gender & Seat */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                          Age *
-                        </label>
-                        <input
-                          type="number" min="1" max="120"
-                          placeholder="Enter your Age"
-                          value={passenger.age}
-                          onChange={(e) => updatePassenger(index, 'age', e.target.value)}
-                          style={{
-                            width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px',
-                            border: `1px solid ${err.age ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem', outline: 'none'
-                          }}
-                        />
-                        {err.age && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.age}</span>}
-                      </div>
+                    <div className="booking-three-fields">
+                      <FormField
+                        label="Age *"
+                        type="number"
+                        min="1"
+                        max="120"
+                        value={passenger.age}
+                        placeholder="Age"
+                        error={errors.age}
+                        onChange={(e) =>
+                          updatePassenger(index, 'age', e.target.value)
+                        }
+                      />
 
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                          Gender *
-                        </label>
-                        <select
-                          value={passenger.gender}
-                          onChange={(e) => updatePassenger(index, 'gender', e.target.value)}
-                          style={{
-                            width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px',
-                            border: `1px solid ${err.gender ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem',
-                            outline: 'none', backgroundColor: '#ffffff'
-                          }}
-                        >
-                          <option value="">Select Gender</option>
-                          <option value="Male">Male</option>
-                          <option value="Female">Female</option>
-                          <option value="Other">Other</option>
-                        </select>
-                        {err.gender && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.gender}</span>}
-                      </div>
+                      <FormField
+                        label="Gender *"
+                        value={passenger.gender}
+                        options={['Male', 'Female', 'Other']}
+                        error={errors.gender}
+                        onChange={(e) =>
+                          updatePassenger(index, 'gender', e.target.value)
+                        }
+                      />
 
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                          Seat Number (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={passenger.seat}
-                          onChange={(e) => updatePassenger(index, 'seat', e.target.value)}
-                          placeholder="e.g. 14B"
-                          style={{
-                            width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px',
-                            border: `1px solid ${err.seat ? '#ef4444' : '#cbd5e1'}`, fontSize: '0.92rem',
-                            outline: 'none', fontWeight: 600
-                          }}
-                        />
-                        {err.seat && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '3px', display: 'block' }}>{err.seat}</span>}
-                      </div>
+                      <FormField
+                        label="Seat (Optional)"
+                        value={passenger.seat}
+                        placeholder="e.g. 14B"
+                        error={errors.seat}
+                        onChange={(e) =>
+                          updatePassenger(
+                            index,
+                            'seat',
+                            e.target.value.toUpperCase()
+                          )
+                        }
+                      />
                     </div>
 
-                    {/* Quick Seat Selector Buttons (per passenger) */}
-                    {sampleSeats && sampleSeats.length > 0 && (
-                      <div style={{ marginTop: '12px' }}>
-                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
-                          Select from Available Seats:
-                        </span>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                          {sampleSeats.map((seat) => {
-                            const selected = passenger.seat === seat;
-                            const takenByOther = !selected && takenSeats.includes(seat);
-                            return (
-                              <button
-                                key={seat}
-                                type="button"
-                                disabled={takenByOther}
-                                onClick={() => updatePassenger(index, 'seat', seat)}
-                                style={{
-                                  padding: '6px 14px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700,
-                                  border: selected ? '2px solid #0284c7' : '1px solid #e2e8f0',
-                                  backgroundColor: selected ? '#e0f2fe' : '#f8fafc',
-                                  color: selected ? '#0284c7' : '#334155',
-                                  opacity: takenByOther ? 0.4 : 1,
-                                  cursor: takenByOther ? 'not-allowed' : 'pointer'
-                                }}
-                              >
-                                {seat}
-                              </button>
-                            );
-                          })}
-                        </div>
+                    <div style={{ marginTop: 14 }}>
+                      <span
+                        style={{
+                          display: 'block',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          marginBottom: 8,
+                          color: '#475569'
+                        }}
+                      >
+                        Select a sample seat
+                      </span>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 6
+                        }}
+                      >
+                        {SAMPLE_SEATS.map((seat) => {
+                          const takenByOther = passengers.some(
+                            (other, otherIndex) =>
+                              otherIndex !== index &&
+                              other.seat.trim().toUpperCase() === seat
+                          );
+
+                          const selected = selectedSeat === seat;
+
+                          return (
+                            <button
+                              type="button"
+                              key={seat}
+                              disabled={takenByOther}
+                              className="booking-seat"
+                              onClick={() =>
+                                updatePassenger(index, 'seat', seat)
+                              }
+                              style={{
+                                borderColor: selected ? '#0284c7' : '#cbd5e1',
+                                background: selected ? '#e0f2fe' : '#f8fafc',
+                                color: selected ? '#0369a1' : '#334155'
+                              }}
+                            >
+                              {seat}
+                            </button>
+                          );
+                        })}
                       </div>
-                    )}
+
+                      <small style={{ color: '#64748b' }}>
+                        Sample seats only. Actual seat availability must be
+                        verified by the backend.
+                      </small>
+                    </div>
                   </div>
                 );
               })}
 
               {passengers.length < passengerCount && (
-                <div className="add-btn">
-                <button type="button" onClick={addPassenger} className="add-passenger-btn">
-                  <span>+</span> Add Passenger
+                <button
+                  type="button"
+                  onClick={addPassenger}
+                  style={{
+                    ...styles.primaryButton,
+                    background: '#f0f9ff',
+                    color: '#0369a1',
+                    border: '1px dashed #0284c7'
+                  }}
+                >
+                  + Add Passenger ({passengers.length}/{passengerCount})
                 </button>
-                </div>
               )}
 
-              <p> 
-                Passenger details added: {passengers.length} / {passengerCount}
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569' }}>
+                Passenger details added: {passengers.length}/{passengerCount}
               </p>
-
-              {/* Simulated Payment Method (once per booking) */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
-                  Simulated Payment Method
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                  {['Credit Card', 'Debit Card', 'UPI / NetBanking'].map((method) => (
-                    <div
-                      key={method}
-                      onClick={() => setPaymentMethod(method)}
-                      style={{
-                        padding: '12px 14px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center',
-                        fontSize: '0.85rem', fontWeight: 600,
-                        border: paymentMethod === method ? '2px solid #0284c7' : '1px solid #e2e8f0',
-                        backgroundColor: paymentMethod === method ? '#f0f9ff' : '#ffffff',
-                        color: paymentMethod === method ? '#0284c7' : '#475569'
-                      }}
-                    >
-                      <CreditCard size={18} style={{ margin: '0 auto 4px', display: 'block' }} />
-                      <div>{method}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
 
+            <div style={{ marginTop: 24 }}>
+              <h3 style={{ fontSize: '1rem', marginBottom: 12 }}>
+                Payment Method
+              </h3>
 
-
-
-
-          </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                  gap: 10
+                }}
+              >
+                {PAYMENT_METHODS.map((method) => (
+                  <button
+                    type="button"
+                    key={method}
+                    onClick={() => setPaymentMethod(method)}
+                    aria-pressed={paymentMethod === method}
+                    style={{
+                      padding: 12,
+                      borderRadius: 10,
+                      border: paymentMethod === method
+                        ? '2px solid #0284c7'
+                        : '1px solid #e2e8f0',
+                      background: paymentMethod === method ? '#f0f9ff' : '#fff',
+                      color: paymentMethod === method ? '#0369a1' : '#475569',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <CreditCard size={19} />
+                    <div style={{ marginTop: 6, fontSize: '0.8rem' }}>
+                      {method}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <small style={{ color: '#64748b' }}>
+                This is a simulated payment selection, not a real payment gateway.
+              </small>
+            </div>
+          </section>
         </div>
 
-        {/* Right Column: Coupon Section & Price Summary Breakdown */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Coupon Section */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '20px',
-              border: '1px solid #e2e8f0',
-              padding: '24px',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.03)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+        {/* Coupons and fare summary */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <section style={styles.card}>
+            <h2
+              style={{
+                fontSize: '1.1rem',
+                display: 'flex',
+                gap: 8,
+                alignItems: 'center',
+                marginTop: 0
+              }}
+            >
               <Tag size={20} color="#0284c7" />
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
-                Apply Promo Coupon
-              </h3>
-            </div>
+              Apply Promo Coupon
+            </h2>
 
-            <div style={{ padding: '14px', marginBottom: '16px', borderRadius: '12px', backgroundColor: '#f0f9ff', border: '1px solid #bae6fd' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>
-                <span>Available coupon points</span>
-                <span>{availableCouponPoints.toLocaleString('en-IN', { maximumFractionDigits: 4 })}</span>
+            <div
+              style={{
+                padding: 14,
+                background: '#f0f9ff',
+                borderRadius: 10,
+                marginBottom: 16
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 8
+                }}
+              >
+                <span>Available points</span>
+                <strong>{availableCouponPoints.toLocaleString('en-IN')}</strong>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginTop: '5px', fontSize: '0.82rem', color: '#475569' }}>
-                <span>Discount value (10 points = ₹1)</span>
-                <span>{formatINR(Number(couponBalance?.availableDiscountAmount) || 0)}</span>
+
+              <div style={{ marginTop: 8, fontSize: '0.8rem', color: '#475569' }}>
+                Discount value (10 points = ₹1):{' '}
+                {formatINR(
+                  Number(couponBalance?.availableDiscountAmount) || 0
+                )}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginTop: '5px', fontSize: '0.78rem', color: '#64748b' }}>
-                <span>Pending / redeemed / total</span>
-                <span>
-                  {(Number(couponBalance?.pendingPoints) || 0).toLocaleString('en-IN', { maximumFractionDigits: 4 })} /
-                  {' '}{(Number(couponBalance?.redeemedPoints) || 0).toLocaleString('en-IN', { maximumFractionDigits: 4 })} /
-                  {' '}{(Number(couponBalance?.totalPoints) || 0).toLocaleString('en-IN', { maximumFractionDigits: 4 })}
-                </span>
-              </div>
+
               {couponBalanceError && (
-                <p style={{ marginTop: '8px', fontSize: '0.78rem', color: '#dc2626' }}>{couponBalanceError}</p>
+                <p style={{ fontSize: '0.8rem', color: '#dc2626' }}>
+                  {couponBalanceError}
+                </p>
               )}
+
               <button
                 type="button"
-                onClick={() => setRedeemCouponPoints((applied) => !applied)}
-                disabled={availableCouponPoints <= 0}
+                disabled={availableCouponPoints <= 0 || !!appliedCoupon}
+                onClick={() => setRedeemCouponPoints((value) => !value)}
                 style={{
-                  marginTop: '12px',
-                  padding: '9px 12px',
-                  borderRadius: '9px',
-                  backgroundColor: redeemCouponPoints ? '#dcfce7' : '#0284c7',
-                  color: redeemCouponPoints ? '#166534' : '#ffffff',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  cursor: availableCouponPoints > 0 ? 'pointer' : 'not-allowed',
-                  opacity: availableCouponPoints > 0 ? 1 : 0.6
+                  marginTop: 12,
+                  ...styles.primaryButton,
+                  width: 'auto',
+                  opacity:
+                    availableCouponPoints <= 0 || appliedCoupon ? 0.5 : 1
                 }}
               >
                 {redeemCouponPoints
-                  ? `Remove Points Discount (${formatINR(availablePointsDiscount)})`
-                  : `Apply Points - Save up to ${formatINR(availablePointsDiscount)}`}
+                  ? `Remove Points Discount (${formatINR(pointsDiscountAmount)})`
+                  : `Apply Points - Save ${formatINR(availablePointsDiscount)}`}
               </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                placeholder="Enter Coupon Code"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                style={{
-                  flex: 1,
-                  padding: '11px 14px',
-                  borderRadius: '12px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  fontFamily: 'var(--font-mono)',
-                  fontWeight: 600,
-                  textTransform: 'uppercase'
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => handleApplyCoupon()}
-                disabled={couponLoading}
-                style={{
-                  padding: '11px 20px',
-                  borderRadius: '12px',
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '0.88rem'
-                }}
-              >
-                {couponLoading ? 'Checking...' : 'Apply'}
-              </button>
-            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleApplyCoupon();
+              }}
+            >
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  placeholder="Enter coupon code"
+                  style={{ ...styles.input, minWidth: 0, flex: 1 }}
+                />
 
-            {/* Success feedback */}
+                <button
+                  type="submit"
+                  disabled={couponLoading}
+                  style={{
+                    ...styles.primaryButton,
+                    width: 'auto',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {couponLoading ? 'Checking...' : 'Apply'}
+                </button>
+              </div>
+            </form>
+
             {couponSuccess && (
               <div
                 style={{
-                  marginTop: '12px',
-                  padding: '10px 14px',
-                  backgroundColor: '#ecfdf5',
-                  border: '1px solid #a7f3d0',
-                  borderRadius: '10px',
-                  color: '#065f46',
-                  fontSize: '0.82rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
+                  marginTop: 12,
+                  padding: 10,
+                  background: '#ecfdf5',
+                  color: '#047857',
+                  borderRadius: 8,
+                  fontSize: '0.82rem'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle size={16} color="#059669" />
-                  <span>{couponSuccess}</span>
-                </div>
+                <CheckCircle size={15} style={{ verticalAlign: 'middle' }} />{' '}
+                {couponSuccess}
                 <button
                   type="button"
                   onClick={handleRemoveCoupon}
-                  style={{ background: 'none', color: '#dc2626', fontSize: '0.75rem', fontWeight: 600 }}
+                  style={{
+                    display: 'block',
+                    marginTop: 8,
+                    border: 0,
+                    color: '#dc2626',
+                    background: 'transparent',
+                    cursor: 'pointer'
+                  }}
                 >
-                  Remove
+                  Remove coupon
                 </button>
               </div>
             )}
 
-            {/* Error feedback */}
             {couponError && (
-              <div
-                style={{
-                  marginTop: '12px',
-                  padding: '10px 14px',
-                  backgroundColor: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  borderRadius: '10px',
-                  color: '#991b1b',
-                  fontSize: '0.82rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <AlertCircle size={16} color="#dc2626" />
-                <span>{couponError}</span>
-              </div>
+              <p role="alert" style={{ color: '#dc2626', fontSize: '0.82rem' }}>
+                {couponError}
+              </p>
             )}
 
-            <div style={{ marginTop: '18px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
-              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155', marginBottom: '10px' }}>
-                Available Coupons (Select to Apply)
-              </h4>
+            <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 18, paddingTop: 16 }}>
+              <h3 style={{ fontSize: '0.95rem' }}>Available Coupons</h3>
+
               {couponsLoading && (
-                <p style={{ fontSize: '0.82rem', color: '#64748b' }}>Loading your coupons...</p>
+                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                  Loading coupons...
+                </p>
               )}
+
               {couponsError && (
-                <p style={{ fontSize: '0.82rem', color: '#dc2626' }}>{couponsError}</p>
+                <p style={{ color: '#dc2626', fontSize: '0.82rem' }}>
+                  {couponsError}
+                </p>
               )}
+
               {!couponsLoading && !couponsError && passengerCoupons.length === 0 && (
-                <p style={{ fontSize: '0.82rem', color: '#64748b' }}>No available coupons</p>
+                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                  No available coupons.
+                </p>
               )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {passengerCoupons.map((coupon) => {
-                  return (
-                    <div
-                      key={coupon.couponId}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {passengerCoupons.map((coupon) => (
+                  <div
+                    key={coupon.couponId}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                      padding: 12,
+                      borderRadius: 10,
+                      border: '1px solid #bbf7d0',
+                      background: '#f0fdf4'
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <strong style={{ fontSize: '0.85rem' }}>
+                        {coupon.couponCode}
+                      </strong>
+                      <div style={{ fontSize: '0.8rem', color: '#475569' }}>
+                        {formatINR(
+                          Number(coupon.discountAmount ?? coupon.discountValue) || 0
+                        )} off
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={couponLoading}
+                      onClick={() => handleApplyCoupon(coupon.couponCode)}
                       style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '10px 12px',
-                        borderRadius: '10px',
-                        backgroundColor: '#f0fdf4',
-                        border: '1px solid #bbf7d0'
+                        ...styles.primaryButton,
+                        width: 'auto',
+                        padding: '8px 12px',
+                        fontSize: '0.8rem'
                       }}
                     >
-                      <div>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-mono)' }}>
-                          {coupon.couponCode} · {formatINR(coupon.discountAmount ?? coupon.discountValue)} off
-                        </div>
-                        <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '3px' }}>
-                          {Number(coupon.couponPoints) > 0 && `${Math.round(coupon.couponPoints)} points · `}
-                          {Number(coupon.discountPercentage) > 0 && `${Math.round(coupon.discountPercentage)}% · `}
-                          Status: {coupon.status}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleApplyCoupon(coupon.couponCode)}
-                        disabled={couponLoading}
-                        style={{
-                          padding: '7px 12px',
-                          borderRadius: '8px',
-                          backgroundColor: '#0284c7',
-                          color: '#ffffff',
-                          fontWeight: 700,
-                          fontSize: '0.78rem',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  );
-                })}
+                      Apply
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
+          </section>
 
-          </div>
-
-          {/* Pricing Summary Breakdown */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '20px',
-              border: '1px solid #e2e8f0',
-              padding: '24px',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.03)'
-            }}
-          >
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '18px' }}>
+          <section style={styles.card}>
+            <h2 style={{ fontSize: '1.1rem', marginTop: 0 }}>
               Fare Breakdown
-            </h3>
+            </h2>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.9rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                <span>Selected Traveller Class</span>
-                <span style={{ fontWeight: 600, color: '#0f172a' }}>{selectedClass}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                <span>Economy Base Fare (per traveller)</span>
-                <span style={{ fontWeight: 600, color: '#0f172a' }}>{formatINR(baseFarePerPassenger)}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ color: '#475569' }}>Traveller class</span>
+                <strong>{selectedClass}</strong>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                <span>Class fare × passengers ({passengerCount})</span>
-                <span style={{ fontWeight: 600, color: '#0f172a' }}>{fareAvailable ? formatINR(originalFare) : 'Fare unavailable'}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ color: '#475569' }}>Base fare per passenger</span>
+                <strong>{formatINR(baseFarePerPassenger)}</strong>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600 }}>
-                <span>Promo Coupon Discount{appliedCoupon ? ` (${appliedCoupon.couponCode})` : ''}</span>
-                <span>-{formatINR(discountAmount)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ color: '#475569' }}>
+                  Total fare ({passengerCount} passenger(s))
+                </span>
+                <strong>
+                  {fareAvailable ? formatINR(originalFare) : 'Unavailable'}
+                </strong>
               </div>
 
-              {redeemCouponPoints && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600 }}>
-                  <span>Points Discount ({(pointsDiscountAmount * 10).toLocaleString('en-IN', { maximumFractionDigits: 4 })} points)</span>
-                  <span>-{formatINR(pointsDiscountAmount)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#059669' }}>
+                <span>
+                  Coupon discount
+                  {appliedCoupon ? ` (${appliedCoupon.couponCode})` : ''}
+                </span>
+                <strong>-{formatINR(discountAmount)}</strong>
+              </div>
+
+              {redeemCouponPoints && !appliedCoupon && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#059669' }}>
+                  <span>Points discount</span>
+                  <strong>-{formatINR(pointsDiscountAmount)}</strong>
                 </div>
               )}
 
-              <div style={{ height: '1px', backgroundColor: '#e2e8f0', margin: '6px 0' }} />
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <div>
-                  <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>Final Payable Amount</span>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>All inclusive</div>
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 12
+                  }}
+                >
+                  <strong>Final Payable Amount</strong>
+                  <strong style={{ fontSize: '1.5rem', color: '#0284c7' }}>
+                    {fareAvailable ? formatINR(totalAmount) : 'Unavailable'}
+                  </strong>
                 </div>
-                <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0284c7' }}>
-                  {fareAvailable ? formatINR(totalAmount) : 'Fare unavailable'}
-                </span>
               </div>
             </div>
 
-            {/* Confirm Booking CTA */}
             <button
               type="button"
               onClick={handleConfirmBooking}
               disabled={submitting || !fareAvailable}
               style={{
-                width: '100%',
-                marginTop: '24px',
-                padding: '14px',
-                borderRadius: '14px',
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '1rem',
+                ...styles.primaryButton,
                 display: 'flex',
-                alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                boxShadow: '0 4px 16px rgba(2, 132, 199, 0.4)',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 22,
                 opacity: submitting || !fareAvailable ? 0.6 : 1,
                 cursor: submitting || !fareAvailable ? 'not-allowed' : 'pointer'
               }}
-              onMouseEnter={(e) => { if (!submitting && fareAvailable) e.currentTarget.style.backgroundColor = '#0369a1'; }}
-              onMouseLeave={(e) => { if (!submitting && fareAvailable) e.currentTarget.style.backgroundColor = '#0284c7'; }}
             >
               {submitting ? (
-                <span>Processing Reservation...</span>
+                'Processing Reservation...'
               ) : (
                 <>
-                  <span>{fareAvailable ? `Confirm Booking (${formatINR(totalAmount)})` : 'Fare unavailable'}</span>
+                  Confirm Booking ({formatINR(totalAmount)})
                   <ArrowRight size={18} />
                 </>
               )}
             </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.75rem', color: '#64748b', marginTop: '14px' }}>
-              <ShieldCheck size={14} color="#059669" />
-              <span>Simulated Instant Confirmation & Zero Cancellation Fee</span>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                color: '#64748b',
+                fontSize: '0.75rem',
+                marginTop: 14
+              }}
+            >
+              <ShieldCheck size={15} color="#059669" />
+              <span>Booking confirmation after successful API response</span>
             </div>
-          </div>
+          </section>
         </div>
       </div>
-
-      <style>{`
-        @media (max-width: 990px) {
-          .booking-checkout-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

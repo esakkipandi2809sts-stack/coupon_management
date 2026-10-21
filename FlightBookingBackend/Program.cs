@@ -4,6 +4,7 @@ using System.Text;
 using FlightBookingBackend.Data;
 using FlightBookingBackend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -32,9 +33,6 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<CouponStatusBackgroundService>();
-
-// Register the coupon percentage calculation service.
-// This service must use FlightBookingDbContext.
 builder.Services.AddScoped<CouponCalculationService>();
 
 // 3. Configure JWT Authentication
@@ -59,7 +57,6 @@ builder.Services
     {
         options.DefaultAuthenticateScheme =
             JwtBearerDefaults.AuthenticationScheme;
-
         options.DefaultChallengeScheme =
             JwtBearerDefaults.AuthenticationScheme;
     })
@@ -68,25 +65,19 @@ builder.Services
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
         options.SaveToken = true;
 
-        options.TokenValidationParameters =
-            new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-
-                IssuerSigningKey = new SymmetricSecurityKey(
-                    Encoding.UTF8.GetBytes(jwtKey)),
-
-                RoleClaimType = ClaimTypes.Role,
-
-                ValidateIssuer = true,
-                ValidIssuer = jwtIssuer,
-
-                ValidateAudience = true,
-                ValidAudience = jwtAudience,
-
-                ValidateLifetime = true,
-                ClockSkew = TimeSpan.Zero
-            };
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey)),
+            RoleClaimType = ClaimTypes.Role,
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -115,7 +106,7 @@ builder.Services
             System.Text.Json.JsonNamingPolicy.CamelCase;
     });
 
-// 6. Configure Swagger / OpenAPI with JWT Bearer support
+// 6. Configure Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(c =>
@@ -124,15 +115,12 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "Flight Ticket Booking Management API",
         Version = "v1",
-        Description =
-            "Flight Ticket Booking and Coupon Management API"
+        Description = "Flight Ticket Booking and Coupon Management API"
     });
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description =
-            "JWT Authorization header. Example: Bearer {token}",
-
+        Description = "JWT Authorization header. Example: Bearer {token}",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.Http,
@@ -159,32 +147,60 @@ builder.Services.AddSwaggerGen(c =>
 // 7. Build the Application
 var app = builder.Build();
 
-// 8. Initialize the Existing Database
+// 8. Print database connection details (without credentials)
+var configuredConnection =
+    app.Configuration.GetConnectionString("DefaultConnection");
+
+if (!string.IsNullOrWhiteSpace(configuredConnection))
+{
+    var sqlBuilder =
+        new SqlConnectionStringBuilder(configuredConnection);
+
+    app.Logger.LogInformation(
+        "Configured SQL Server: {Server}; Database: {Database}",
+        sqlBuilder.DataSource,
+        sqlBuilder.InitialCatalog);
+}
+
+// 9. Initialize and verify the database connection
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
 
     try
     {
         var context =
             services.GetRequiredService<FlightBookingDbContext>();
 
+        // Open the actual configured database connection
+        await context.Database.OpenConnectionAsync();
+
+        var connection = context.Database.GetDbConnection();
+
+        logger.LogInformation(
+            "Connected SQL Server: {Server}; Database: {Database}",
+            connection.DataSource,
+            connection.Database);
+
+        await context.Database.CloseConnectionAsync();
+
+        // Keep the existing database initialization
         DbInitializer.Initialize(context);
+
+        logger.LogInformation("Database initialization completed.");
     }
     catch (Exception ex)
     {
-        var logger =
-            services.GetRequiredService<ILogger<Program>>();
-
         logger.LogCritical(
             ex,
-            "Database initialization failed.");
+            "Database connection or initialization failed.");
 
         throw;
     }
 }
 
-// 9. Configure HTTP Request Pipeline
+// 10. Configure HTTP Request Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

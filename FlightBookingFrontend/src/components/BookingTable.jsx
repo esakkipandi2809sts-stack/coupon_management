@@ -44,10 +44,10 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
       }}
     >
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.88rem',whiteSpace:'nowrap' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>
           <thead>
             <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-              <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Reference</th>
+              <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Booking ID</th>
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Flight</th>
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Route</th>
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Departure</th>
@@ -127,61 +127,18 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                 </td>
 
                 {/* Status */}
-                <td style={{ padding: '16px 18px' }}>
+                <td style={{ padding: '16px 18px', display: 'flex', justifyContent: 'flex-end',gap: '8px' }}>
                   <span className={`badge ${STATUS_BADGES[b.bookingStatus] || 'badge-pending'}`}>
                     {b.bookingStatus}
                   </span>
-                </td>
-
-                {/* Actions */}
-                <td style={{ padding: '16px 18px', textAlign: 'right' }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                    <button
-                      onClick={() => onView(b)}
-                      title="View Details"
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        backgroundColor: '#f0f9ff',
-                        color: '#0284c7',
-                        border: '1px solid #bae6fd',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '0.78rem',
-                        fontWeight: 600
-                      }}
-                    >
-                      <Eye size={14} />
-                      <span>View</span>
-                    </button>
 
-                    {b.bookingStatus !== 'Failed' && (
-                    <button
-                      onClick={() => onDownload(b)}
-                      title="Download Ticket"
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        backgroundColor: '#f8fafc',
-                        color: '#334155',
-                        border: '1px solid #e2e8f0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '0.78rem',
-                        fontWeight: 600
-                      }}
-                    >
-                      <Download size={14} />
-                      <span>Ticket</span>
-                    </button>
-                    )}
 
                     {isActiveBooking(b) && onReschedule && (
                       <button
                         onClick={() => onReschedule(b)}
                         title="Reschedule Booking"
+                        className="badge-Reschedule"
                         style={{
                           padding: '6px 10px',
                           borderRadius: '8px',
@@ -221,6 +178,57 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                         <span>Cancel</span>
                       </button>
                     )}
+                  </div>
+                </td>
+
+                
+
+                {/* Actions */}
+                <td style={{ padding: '16px 18px', textAlign: 'right' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <button
+                      onClick={() => onView(b)}
+                      title="View Details"
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        backgroundColor: '#f0f9ff',
+                        color: '#0284c7',
+                        border: '1px solid #bae6fd',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600
+                      }}
+                    >
+                      <Eye size={14} />
+                      <span>View</span>
+                    </button>
+
+                    {b.bookingStatus !== 'Failed' && (
+                      <button
+                        onClick={() => onDownload(b)}
+                        title="Download Ticket"
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          backgroundColor: '#f8fafc',
+                          color: '#334155',
+                          border: '1px solid #e2e8f0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '0.78rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        <Download size={14} />
+                        <span>Ticket</span>
+                      </button>
+                    )}
+
+
                   </div>
                 </td>
               </tr>

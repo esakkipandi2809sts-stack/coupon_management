@@ -1294,14 +1294,14 @@ export default function AvailableCreation() {
             <table className="ac-flights-table">
               <thead>
                 <tr>
-                  <th>Flight Number</th>
-                  <th>Travel Place</th>
-                  <th>Booking Date</th>
-                  <th>Departure Date</th>
-                  <th>Price</th>
-                  <th>Status</th>
-                  <th>Trip Type</th>
-                  <th>Created By</th>
+                  <th style={{textAlign:'center'}}>Travel Place</th>
+                  <th style={{textAlign:'center'}}>Flight Number</th>
+                  <th style={{textAlign:'center'}}>Booking Date</th>
+                  <th style={{textAlign:'center'}}>Departure Date</th>
+                  <th style={{textAlign:'center'}}>Price</th>
+                  <th style={{textAlign:'center'}}>Status</th>
+                  <th style={{textAlign:'center'}}>Trip Type</th>
+                  <th style={{textAlign:'center'}}>Created By</th>
                   {isAdmin && <th>Actions</th>}
                 </tr>
               </thead>

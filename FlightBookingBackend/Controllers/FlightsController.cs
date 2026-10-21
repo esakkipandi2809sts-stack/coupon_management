@@ -308,10 +308,13 @@ namespace FlightBookingBackend.Controllers
             }
         }
 
-        // Username comes from the JWT only (never from the request body). Tokens issued before the
-        // "username" claim existed fall back to the email claim, which equals the username in this project.
+        // Full name comes from the JWT (ClaimTypes.Name). Falls back to username/email if name is missing.
         private string? GetCurrentUserName()
         {
+            var fullName = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (!string.IsNullOrWhiteSpace(fullName))
+                return fullName.Trim();
+
             var username = User.FindFirst("username")?.Value ?? User.FindFirst(ClaimTypes.Email)?.Value;
             return string.IsNullOrWhiteSpace(username) ? null : username.Trim();
         }
