@@ -62,8 +62,6 @@ CREATE TABLE dbo.Flights (
     Airline NVARCHAR(100) NOT NULL,
     FromCity NVARCHAR(100) NOT NULL,
     ToCity NVARCHAR(100) NOT NULL,
-    FromAirportCode VARCHAR(3) NULL,
-    ToAirportCode VARCHAR(3) NULL,
     StopCount INT NULL,
     BookingDate DATE NOT NULL CONSTRAINT DF_Flights_BookingDate DEFAULT CAST(GETDATE() AS DATE),
     DepartureDate DATE NOT NULL,

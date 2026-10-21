@@ -9,8 +9,6 @@ namespace FlightBookingBackend.DTOs
         public string Airline { get; set; } = string.Empty;
         public string FromCity { get; set; } = string.Empty;
         public string ToCity { get; set; } = string.Empty;
-        public string? FromAirportCode { get; set; }
-        public string? ToAirportCode { get; set; }
         public int? StopCount { get; set; }
         public DateOnly? BookingDate { get; set; }
         public DateOnly DepartureDate { get; set; }
@@ -69,10 +67,6 @@ namespace FlightBookingBackend.DTOs
         public string FromCity { get; set; } = string.Empty;
         [Required, StringLength(100, MinimumLength = 1)]
         public string ToCity { get; set; } = string.Empty;
-        [StringLength(3, MinimumLength = 3), RegularExpression("^[A-Za-z]{3}$")]
-        public string? FromAirportCode { get; set; }
-        [StringLength(3, MinimumLength = 3), RegularExpression("^[A-Za-z]{3}$")]
-        public string? ToAirportCode { get; set; }
         [Range(0, 99)]
         public int? StopCount { get; set; }
         public DateOnly? BookingDate { get; set; }

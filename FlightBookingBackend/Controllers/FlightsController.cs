@@ -246,9 +246,18 @@ namespace FlightBookingBackend.Controllers
                 var created = await _flightService.CreateFlightAsync(dto, creatorUserName);
                 return CreatedAtAction(nameof(GetFlightById), new { id = created.FlightId }, created);
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
             catch (InvalidOperationException ex)
             {
                 return Conflict(new { message = ex.Message });
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex, "Database error while creating flight");
+                return StatusCode(500, new { message = "The flight could not be saved to the database. No record was created." });
             }
             catch (Exception ex)
             {
@@ -353,9 +362,18 @@ namespace FlightBookingBackend.Controllers
                     ? NotFound(new { message = $"Flight with ID {id} not found." })
                     : Ok(updated);
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
             catch (InvalidOperationException ex)
             {
                 return Conflict(new { message = ex.Message });
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex, "Database error while updating flight {Id}", id);
+                return StatusCode(500, new { message = "Error saving flight updates to the database." });
             }
             catch (Exception ex)
             {

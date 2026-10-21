@@ -25,15 +25,7 @@ namespace FlightBookingBackend.Models
         [Required]
         [MaxLength(100)]
         public string ToCity { get; set; } = string.Empty;
-
-        [MaxLength(3)]
-        [Column(TypeName = "varchar(3)")]
-        public string? FromAirportCode { get; set; }
-
-        [MaxLength(3)]
-        [Column(TypeName = "varchar(3)")]
-        public string? ToAirportCode { get; set; }
-
+ 
         public int? StopCount { get; set; }
 
         [Column(TypeName = "date")]

@@ -155,8 +155,6 @@ public class FlightServiceTests
                 Airline = "Air India",
                 FromCity = "Chennai",
                 ToCity = "Bengaluru",
-                FromAirportCode = "MAA",
-                ToAirportCode = "BLR",
                 StopCount = 0,
                 DepartureDate = travelDate,
                 DepartureTime = "14:00",

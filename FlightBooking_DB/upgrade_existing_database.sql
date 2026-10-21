@@ -21,10 +21,6 @@ IF COL_LENGTH(N'dbo.Users', N'Username') IS NULL
 -- Flights / Bookings: route distance and fare columns
 IF COL_LENGTH(N'dbo.Flights', N'DistanceKm') IS NULL
     ALTER TABLE dbo.Flights ADD DistanceKm DECIMAL(10,2) NULL;
-IF COL_LENGTH(N'dbo.Flights', N'FromAirportCode') IS NULL
-    ALTER TABLE dbo.Flights ADD FromAirportCode VARCHAR(3) NULL;
-IF COL_LENGTH(N'dbo.Flights', N'ToAirportCode') IS NULL
-    ALTER TABLE dbo.Flights ADD ToAirportCode VARCHAR(3) NULL;
 IF COL_LENGTH(N'dbo.Flights', N'StopCount') IS NULL
     ALTER TABLE dbo.Flights ADD StopCount INT NULL;
 IF COL_LENGTH(N'dbo.Flights', N'BookingDate') IS NULL

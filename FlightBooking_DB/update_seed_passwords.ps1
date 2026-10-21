@@ -2,7 +2,7 @@ param(
     [string]$Server = "(localdb)\MSSQLLocalDB"
 )
 
-$connectionString = "Server=$Server;Database=FlightBookingDB;Integrated Security=True;TrustServerCertificate=True;"
+$connectionString = "Server=$Server;Database=FlightBooking_DB;Integrated Security=True;TrustServerCertificate=True;"
 $conn = New-Object System.Data.SqlClient.SqlConnection($connectionString)
 $conn.Open()
 

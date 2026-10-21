@@ -47,8 +47,6 @@ namespace FlightBookingBackend.Data
             {
                 entity.HasKey(e => e.FlightId);
                 entity.HasIndex(e => new { e.FromCity, e.ToCity, e.DepartureDate });
-                entity.Property(e => e.FromAirportCode).IsUnicode(false).HasMaxLength(3);
-                entity.Property(e => e.ToAirportCode).IsUnicode(false).HasMaxLength(3);
                 entity.Property(e => e.CreatedByUserName).HasMaxLength(150);
                 entity.Property(e => e.TripType).HasMaxLength(20).HasDefaultValue("OneWay");
                 entity.HasIndex(e => e.ItineraryId)
