@@ -55,12 +55,12 @@ export function getAirlineClassPercentage(airline, flightClass) {
 
   // IndiGo Business – 2%
   if (normAirline === 'indigo' && normClass === 'business') return 2;
-  // SpiceJet Business – 1%
-  if (normAirline === 'spicejet' && normClass === 'business') return 1;
+  // Spice Jet Business – 1%
+  if (normAirline === 'Spice Jet' && normClass === 'business') return 1;
   // IndiGo Economy – 2%
   if (normAirline === 'indigo' && normClass === 'economy') return 2;
-  // SpiceJet First – 1%
-  if (normAirline === 'spicejet' && (normClass === 'first' || normClass === 'first class')) return 1;
+  // Spice Jet First – 1%
+  if (normAirline === 'Spice Jet' && (normClass === 'first' || normClass === 'first class')) return 1;
   // British Airways Business – 2%
   if (normAirline.includes('british') && normClass === 'business') return 2;
   // British Airways Economy – 1%
@@ -68,7 +68,7 @@ export function getAirlineClassPercentage(airline, flightClass) {
 
   // Additional combinations
   if (normAirline === 'indigo') return 2;
-  if (normAirline === 'spicejet') return 1;
+  if (normAirline === 'Spice Jet') return 1;
   if (normAirline.includes('british')) {
     return normClass === 'first' || normClass === 'business' ? 2 : 1;
   }

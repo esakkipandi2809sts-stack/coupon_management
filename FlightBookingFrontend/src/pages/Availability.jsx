@@ -234,7 +234,7 @@ export default function Availability() {
         if (active) {
           setOptionsError(
             err.response?.data?.message ||
-              'Unable to load airport and airline choices.'
+            'Unable to load airport and airline choices.'
           );
         }
       })
@@ -302,10 +302,10 @@ export default function Availability() {
       current.map((segment) =>
         segment.id === id
           ? {
-              ...segment,
-              fromCity: segment.toCity,
-              toCity: segment.fromCity,
-            }
+            ...segment,
+            fromCity: segment.toCity,
+            toCity: segment.fromCity,
+          }
           : segment
       )
     );
@@ -512,7 +512,7 @@ export default function Availability() {
 
         setError(
           err.response?.data?.message ||
-            'Unable to search flights. Please try again.'
+          'Unable to search flights. Please try again.'
         );
       }
     } finally {
@@ -557,9 +557,8 @@ export default function Availability() {
             <button
               type="button"
               key={type}
-              className={`availability-trip-tab${
-                tripType === type ? ' is-active' : ''
-              }`}
+              className={`availability-trip-tab${tripType === type ? ' is-active' : ''
+                }`}
               aria-pressed={tripType === type}
               onClick={() => updateTripType(type)}
             >
@@ -602,9 +601,8 @@ export default function Availability() {
                     className="availability-swap"
                     type="button"
                     onClick={() => handleSwap(segment.id)}
-                    aria-label={`Swap origin and destination for segment ${
-                      index + 1
-                    }`}
+                    aria-label={`Swap origin and destination for segment ${index + 1
+                      }`}
                     title="Swap origin and destination"
                   >
                     <ArrowLeftRight size={18} />
@@ -663,9 +661,8 @@ export default function Availability() {
             </div>
           ) : (
             <div
-              className={`availability-main-row${
-                tripType === 'Round Trip' ? ' has-return' : ''
-              }`}
+              className={`availability-main-row${tripType === 'Round Trip' ? ' has-return' : ''
+                }`}
             >
               <LocationField
                 label="Enter Origin"
@@ -737,7 +734,7 @@ export default function Availability() {
             </div>
           )}
 
-          
+
           <div className="availability-additional">
             <div className="availability-passengers">
               <div className="availability-label">Passengers</div>
@@ -793,9 +790,8 @@ export default function Availability() {
                       {CABIN_CLASSES.map((cabin) => (
                         <label
                           key={cabin}
-                          className={`cabin-option ${
-                            selectedCabin === cabin ? 'selected' : ''
-                          }`}
+                          className={`cabin-option ${selectedCabin === cabin ? 'selected' : ''
+                            }`}
                         >
                           <input
                             type="radio"

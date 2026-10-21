@@ -6,10 +6,12 @@ import {
   CheckCircle2,
   AlertCircle,
   Layers,
-  Search,
   RefreshCw,
   Grid,
-  List
+  List,
+  TrendingUp,
+  Coins,
+  BadgePercent,
 } from 'lucide-react';
 import { couponApi } from '../services/api';
 import CouponCard from '../components/CouponCard';
@@ -29,6 +31,13 @@ export default function Coupons() {
     expiredCoupons: 0,
     totalCoupons: 0,
   });
+  const [balance, setBalance] = useState({
+    availablePoints: 0,
+    pendingPoints: 0,
+    redeemedPoints: 0,
+    totalPoints: 0,
+    availableDiscountAmount: 0,
+  });
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,12 +51,16 @@ export default function Coupons() {
     setCoupons([]);
     setError('');
     try {
-      const [couponsRes, statsRes] = await Promise.all([
+      const requests = [
         isAdmin ? couponApi.getAllForAdmin() : couponApi.getAll(),
-        isAdmin ? couponApi.getAdminStatistics() : couponApi.getStatistics()
-      ]);
+        isAdmin ? couponApi.getAdminStatistics() : couponApi.getStatistics(),
+      ];
+      if (!isAdmin) requests.push(couponApi.getBalance());
+
+      const [couponsRes, statsRes, balanceRes] = await Promise.all(requests);
       setStats(statsRes.data);
       setCoupons(couponsRes.data);
+      if (balanceRes) setBalance(balanceRes.data);
     } catch (err) {
       console.error('Failed to load coupons:', err);
       setError(err.response?.data?.message || 'Failed to load coupon data.');
@@ -123,6 +136,69 @@ export default function Coupons() {
           <span>Refresh Coupons</span>
         </button>
       </div>
+
+      {/* Points Balance Banner — visible to regular users only */}
+      {!isAdmin && (
+        <div style={{
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0284c7 100%)',
+          borderRadius: '20px',
+          padding: '24px 28px',
+          color: '#ffffff',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '24px',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: '0 8px 32px rgba(2,132,199,0.25)',
+        }}>
+          {/* Left — available points hero */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{
+              width: '56px', height: '56px', borderRadius: '16px',
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backdropFilter: 'blur(8px)',
+            }}>
+              <TrendingUp size={28} color="#7dd3fc" />
+            </div>
+            <div>
+              <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#bae6fd', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>
+                Available Points
+              </p>
+              <p style={{ fontSize: '2.4rem', fontWeight: 900, color: '#ffffff', margin: 0, lineHeight: 1.1 }}>
+                {loading ? '…' : Math.round(balance.availablePoints).toLocaleString()}
+              </p>
+              <p style={{ fontSize: '0.82rem', color: '#7dd3fc', margin: 0 }}>
+                ≈ ₹{loading ? '…' : Number(balance.availableDiscountAmount).toFixed(2)} discount value
+              </p>
+            </div>
+          </div>
+
+          {/* Right — mini stats */}
+          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '0.72rem', color: '#bae6fd', fontWeight: 600, textTransform: 'uppercase', margin: '0 0 4px' }}>Total Earned</p>
+              <p style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+                {loading ? '—' : Math.round(balance.totalPoints).toLocaleString()}
+              </p>
+            </div>
+            <div style={{ width: '1px', backgroundColor: 'rgba(255,255,255,0.2)' }} />
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '0.72rem', color: '#bae6fd', fontWeight: 600, textTransform: 'uppercase', margin: '0 0 4px' }}>Pending</p>
+              <p style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fbbf24', margin: 0 }}>
+                {loading ? '—' : Math.round(balance.pendingPoints).toLocaleString()}
+              </p>
+            </div>
+            <div style={{ width: '1px', backgroundColor: 'rgba(255,255,255,0.2)' }} />
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '0.72rem', color: '#bae6fd', fontWeight: 600, textTransform: 'uppercase', margin: '0 0 4px' }}>Redeemed</p>
+              <p style={{ fontSize: '1.4rem', fontWeight: 800, color: '#4ade80', margin: 0 }}>
+                {loading ? '—' : Math.round(balance.redeemedPoints).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Coupon summary is calculated from the passenger's SQL Server records */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
