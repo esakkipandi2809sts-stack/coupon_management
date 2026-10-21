@@ -740,9 +740,9 @@ public class BookingCouponWorkflowTests
 
     [Theory]
     [InlineData("IndiGo", "Business", 2, 10000, 200, 20, 9980)]
-    [InlineData("Spice Jet", "Business", 1, 10000, 100, 10, 9990)]
+    [InlineData("SpiceJet", "Business", 1, 10000, 100, 10, 9990)]
     [InlineData("IndiGo", "Economy", 2, 10000, 200, 20, 9980)]
-    [InlineData("Spice Jet", "First", 1, 10000, 100, 10, 9990)]
+    [InlineData("SpiceJet", "First", 1, 10000, 100, 10, 9990)]
     [InlineData("British Airways", "Business", 2, 10000, 200, 20, 9980)]
     [InlineData("British Airways", "Economy", 1, 10000, 100, 10, 9990)]
     [InlineData("Air India", "Business", 2, 10000, 200, 20, 9980)]
