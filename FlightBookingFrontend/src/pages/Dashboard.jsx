@@ -237,8 +237,7 @@ export default function Dashboard() {
 
           </div>
           {!isAdmin && (
-            <button
-              onClick={() => navigate('/my-bookings')}
+            <button              
               style={{ background: 'none', color: '#0284c7', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
             >
               <span>View My Bookings</span>
@@ -270,7 +269,6 @@ export default function Dashboard() {
               <div
                 key={card.id}
                 data-testid={`booking-card-${card.id}`}
-                onClick={clickable ? () => navigate(`/my-bookings?status=${card.filter}`) : undefined}
                 style={{
                   backgroundColor: '#ffffff',
                   borderRadius: '18px',
