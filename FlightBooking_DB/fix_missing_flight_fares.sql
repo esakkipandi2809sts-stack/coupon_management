@@ -11,7 +11,7 @@ GO
 -- STEP 2: Set the real route distance (km) per flight (replace the placeholder value)
 UPDATE dbo.Flights
 SET DistanceKm = 540.00          -- <== put the real distance here
-WHERE FlightNumber = N'EP-28';
+WHERE FlightNumber = N'KM-28';
 GO
 
 -- STEP 3: Recalculate Price (Economy fare = MAX(DistanceKm * 10, 1500))
