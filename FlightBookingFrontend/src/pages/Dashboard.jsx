@@ -213,7 +213,7 @@ export default function Dashboard() {
             <span>{isAdmin ? 'Administrator Console' : 'Real-time System Overview'}</span>
           </div>
           <h1 style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-            {isAdmin ? 'Admin Dashboard' : 'User Dashboard'} — Welcome back, {currentUser?.fullName || 'Traveler'}!
+            Welcome back , {currentUser?.fullName || 'Traveler'} !
           </h1>
           <p style={{ color: '#e0f2fe', marginTop: '8px', fontSize: '0.95rem' }}>
             {isAdmin
