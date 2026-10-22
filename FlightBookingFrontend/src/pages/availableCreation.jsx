@@ -566,7 +566,7 @@ function SegmentForm({
             {...input('totalSeats', {
               type: 'number',
               min: 1,
-              value: 25,
+              placeholder: 'e.g. 180',
             })}
           />
         </Field>
