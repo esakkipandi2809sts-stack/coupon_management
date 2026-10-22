@@ -169,7 +169,7 @@ export default function Coupons() {
                 {loading ? '…' : Math.round(balance.availablePoints).toLocaleString()}
               </p>
               <p style={{ fontSize: '0.82rem', color: '#7dd3fc', margin: 0 }}>
-                ≈ ₹{loading ? '…' : Number(balance.availableDiscountAmount).toFixed(2)} discount value
+                ≈ ₹{loading ? '…' : Number(balance.availableDiscountAmount).toFixed(2)} Cash Equivalent
               </p>
             </div>
           </div>

@@ -149,7 +149,7 @@ export default function BookingConfirmation() {
 
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#bae6fd', letterSpacing: '0.08em' }}>
-              Booking Reference
+              Booking ID
             </div>
             <div style={{ fontSize: '1.3rem', fontWeight: 800, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
               {booking.bookingReference}

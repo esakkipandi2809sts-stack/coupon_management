@@ -137,7 +137,7 @@ GO
 -- ----------------------------------------------------------------------------
 CREATE TABLE dbo.Bookings (
     BookingId INT IDENTITY(1,1) NOT NULL,
-    BookingReference NVARCHAR(50) NOT NULL,
+    Booking Code NVARCHAR(50) NOT NULL,
     UserId INT NOT NULL,
     FlightId INT NOT NULL,
     PassengerName NVARCHAR(150) NOT NULL,

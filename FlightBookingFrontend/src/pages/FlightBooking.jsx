@@ -1037,62 +1037,15 @@ export default function FlightBooking() {
                 display: 'flex',
                 gap: 8,
                 alignItems: 'center',
-                marginTop: 0
+                marginTop: 0,
+                marginBottom: 16
               }}
             >
               <Tag size={20} color="#0284c7" />
               Apply Promo Coupon
             </h2>
 
-            <div
-              style={{
-                padding: 14,
-                background: '#f0f9ff',
-                borderRadius: 10,
-                marginBottom: 16
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 8
-                }}
-              >
-                <span>Available points</span>
-                <strong>{availableCouponPoints.toLocaleString('en-IN')}</strong>
-              </div>
 
-              <div style={{ marginTop: 8, fontSize: '0.8rem', color: '#475569' }}>
-                Discount value (10 points = ₹1):{' '}
-                {formatINR(
-                  Number(couponBalance?.availableDiscountAmount) || 0
-                )}
-              </div>
-
-              {couponBalanceError && (
-                <p style={{ fontSize: '0.8rem', color: '#dc2626' }}>
-                  {couponBalanceError}
-                </p>
-              )}
-
-              <button
-                type="button"
-                disabled={availableCouponPoints <= 0 || !!appliedCoupon}
-                onClick={() => setRedeemCouponPoints((value) => !value)}
-                style={{
-                  marginTop: 12,
-                  ...styles.primaryButton,
-                  width: 'auto',
-                  opacity:
-                    availableCouponPoints <= 0 || appliedCoupon ? 0.5 : 1
-                }}
-              >
-                {redeemCouponPoints
-                  ? `Remove Points Discount (${formatINR(pointsDiscountAmount)})`
-                  : `Apply Points - Save ${formatINR(availablePointsDiscount)}`}
-              </button>
-            </div>
 
             <form
               onSubmit={(e) => {
