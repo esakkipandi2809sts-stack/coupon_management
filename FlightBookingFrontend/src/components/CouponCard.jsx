@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tag, Copy, Check } from 'lucide-react';
+import { Tag, Copy, Check, Award } from 'lucide-react';
 import { formatINR } from '../utils/flightPricing';
 
 export default function CouponCard({ coupon, onApply }) {
@@ -13,6 +13,7 @@ export default function CouponCard({ coupon, onApply }) {
 
   const usagePercentage = Math.min(100, Math.round((coupon.usedCount / coupon.totalUsageLimit) * 100));
   const couponDiscountAmount = Number(coupon.discountAmount ?? coupon.discountValue);
+  const couponPoints = Number(coupon.couponPoints || 0);
 
   const getStatusBadge = () => {
     const status = coupon.status.toLowerCase();
@@ -66,9 +67,12 @@ export default function CouponCard({ coupon, onApply }) {
           </div>
           {getStatusBadge()}
         </div>
-        <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
-          {formatINR(couponDiscountAmount)} OFF
-        </h4>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
+            {formatINR(couponDiscountAmount)} OFF
+          </h4>
+
+        </div>
 
       </div>
 
