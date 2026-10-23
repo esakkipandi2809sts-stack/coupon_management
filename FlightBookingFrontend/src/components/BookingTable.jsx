@@ -164,8 +164,8 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                         style={{
                           padding: '6px 10px',
                           borderRadius: '8px',
-                          backgroundColor: '#dc2626',
-                          color: '#ffffff',
+                          color: '#dc2626',
+                          backgroundColor: '#fef2f2',
                           border: '1px solid #dc2626',
                           display: 'flex',
                           alignItems: 'center',
