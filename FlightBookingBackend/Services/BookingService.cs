@@ -550,7 +550,20 @@ namespace FlightBookingBackend.Services
                 .FirstOrDefaultAsync(c => c.GeneratedForBookingId == booking.BookingId);
             if (earnedCoupon != null && earnedCoupon.UsedCount == 0)
             {
-                earnedCoupon.Status = "Expired";
+                _context.Coupons.Remove(earnedCoupon);
+            }
+
+            var appliedUsage = await _context.CouponUsages
+                .Include(u => u.Coupon)
+                .FirstOrDefaultAsync(u => u.BookingId == booking.BookingId);
+            if (appliedUsage != null)
+            {
+                if (appliedUsage.Coupon != null)
+                {
+                    appliedUsage.Coupon.UsedCount = Math.Max(0, appliedUsage.Coupon.UsedCount - 1);
+                    appliedUsage.Coupon.Status = "Available";
+                }
+                _context.CouponUsages.Remove(appliedUsage);
             }
 
             var earnedTransaction = await _context.CouponTransactions

@@ -546,7 +546,20 @@ export default function Dashboard() {
                       <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0284c7', fontFamily: 'var(--font-mono)' }}>
                         {b.bookingReference}
                       </span>
-                      <span className="badge badge-confirmed" style={{ fontSize: '0.65rem', padding: '2px 8px' }}>
+                      <span
+                        className="badge"
+                        style={{
+                          fontSize: '0.65rem',
+                          padding: '2px 8px',
+                          ...(b.bookingStatus === 'Confirmed'
+                            ? { backgroundColor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }
+                            : b.bookingStatus === 'Rescheduled'
+                            ? { backgroundColor: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }
+                            : b.bookingStatus === 'Cancelled'
+                            ? { backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }
+                            : {}),
+                        }}
+                      >
                         {b.bookingStatus}
                       </span>
                     </div>

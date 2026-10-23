@@ -127,7 +127,7 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                 </td>
 
                 {/* Status */}
-                <td style={{ padding: '16px 18px', display: 'flex', justifyContent: 'flex-end',gap: '8px' }}>
+                <td style={{ padding: '16px 18px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                   <span className={`badge ${STATUS_BADGES[b.bookingStatus] || 'badge-pending'}`}>
                     {b.bookingStatus}
                   </span>
@@ -181,7 +181,7 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                   </div>
                 </td>
 
-                
+
 
                 {/* Actions */}
                 <td style={{ padding: '16px 18px', textAlign: 'right' }}>

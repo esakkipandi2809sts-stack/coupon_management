@@ -67,7 +67,10 @@ export default function MyBookings() {
 
     try {
       const res = await bookingApi.getMyBookings();
-      setBookings(Array.isArray(res.data) ? res.data : []);
+      const sorted = (Array.isArray(res.data) ? res.data : [])
+        .slice()
+        .sort((a, b) => new Date(b.bookingDate) - new Date(a.bookingDate));
+      setBookings(sorted);
     } catch (err) {
       console.error('Failed to fetch bookings:', err);
       setErrorMessage(

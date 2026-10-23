@@ -387,7 +387,7 @@ export default function Coupons() {
             </div>
           ) : viewMode === 'grid' ? (
             /* Grid Cards View */
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+            <div style={{ display: 'grid',  gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' ,color:'red'}}>
               {filteredCoupons.map((c) => (
                 <CouponCard
                   key={c.couponId}

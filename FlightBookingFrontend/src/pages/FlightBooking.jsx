@@ -1,17 +1,8 @@
-
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Plane,
-  Clock,
-  User,
-  Tag,
-  CheckCircle,
-  AlertCircle,
-  CreditCard,
-  ShieldCheck,
-  ChevronRight,
-  ArrowRight
+  Plane, Clock, User, Tag, CheckCircle, AlertCircle, CreditCard,
+  ShieldCheck, ChevronRight, ArrowRight
 } from 'lucide-react';
 
 import { bookingApi, couponApi } from '../services/api';
@@ -19,104 +10,59 @@ import { authUtil } from '../utils/auth';
 import { calculateClassFare, formatINR } from '../utils/flightPricing';
 
 const EMPTY_PASSENGER = {
-  name: '',
-  email: '',
-  phone: '',
-  age: '',
-  gender: '',
-  seat: ''
+  name: '', email: '', phone: '', age: '', gender: '', seat: ''
 };
 
 const SAMPLE_SEATS = [
-  '11A', '11B', '12A', '12B',
-  '13A', '13B', '14A', '14B',
-  '15A', '15B', '16C', '16D',
-  '17C', '17D', '18C', '18D',
+  '11A', '11B', '12A', '12B', '13A', '13B', '14A', '14B',
+  '15A', '15B', '16C', '16D', '17C', '17D', '18C', '18D',
   '19C', '19D', '20C', '20D'
 ];
 
-const PAYMENT_METHODS = [
-  'Credit Card',
-  'Debit Card',
-  'UPI / NetBanking'
-];
+const PAYMENT_METHODS = ['Credit Card', 'Debit Card', 'UPI / NetBanking'];
 
 const styles = {
   card: {
-    background: '#fff',
-    border: '1px solid #e2e8f0',
-    borderRadius: 18,
-    padding: 24,
-    boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
-    minWidth: 0
+    background: '#fff', border: '1px solid #e2e8f0', borderRadius: 18,
+    padding: 24, boxShadow: '0 4px 15px rgba(0,0,0,0.03)', minWidth: 0
   },
   label: {
-    display: 'block',
-    fontSize: '0.85rem',
-    fontWeight: 600,
-    color: '#334155',
-    marginBottom: 6
+    display: 'block', fontSize: '0.85rem', fontWeight: 600,
+    color: '#334155', marginBottom: 6
   },
   input: {
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '11px 12px',
-    borderRadius: 10,
-    border: '1px solid #cbd5e1',
-    fontSize: '0.9rem',
-    outline: 'none',
-    background: '#fff'
+    width: '100%', boxSizing: 'border-box', padding: '11px 12px',
+    borderRadius: 10, border: '1px solid #cbd5e1', fontSize: '0.9rem',
+    outline: 'none', background: '#fff'
   },
   primaryButton: {
-    width: '100%',
-    padding: 13,
-    border: 0,
-    borderRadius: 12,
-    background: '#0284c7',
-    color: '#fff',
-    fontWeight: 700,
-    fontSize: '0.95rem',
-    cursor: 'pointer'
+    width: '100%', padding: 13, border: 0, borderRadius: 12,
+    background: '#0284c7', color: '#fff', fontWeight: 700,
+    fontSize: '0.95rem', cursor: 'pointer'
   },
   error: {
-    padding: 12,
-    background: '#fef2f2',
-    color: '#b91c1c',
-    border: '1px solid #fecaca',
-    borderRadius: 10,
-    fontSize: '0.85rem'
+    padding: 12, background: '#fef2f2', color: '#b91c1c',
+    border: '1px solid #fecaca', borderRadius: 10, fontSize: '0.85rem'
   }
 };
 
 function FormField({
-  label,
-  value,
-  onChange,
-  error,
-  type = 'text',
-  placeholder = '',
-  min,
-  max,
-  options
+  label, value, onChange, error, type = 'text', placeholder = '',
+  min, max, options
 }) {
+  const inputStyle = {
+    ...styles.input,
+    borderColor: error ? '#ef4444' : '#cbd5e1'
+  };
+
   return (
     <div style={{ minWidth: 0 }}>
       <label style={styles.label}>{label}</label>
-
       {options ? (
-        <select
-          value={value}
-          onChange={onChange}
-          style={{
-            ...styles.input,
-            borderColor: error ? '#ef4444' : '#cbd5e1'
-          }}
-        >
+        <select value={value} onChange={onChange} style={inputStyle}>
           <option value="">Select {label.replace(' *', '')}</option>
           {options.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
+            <option key={option} value={option}>{option}</option>
           ))}
         </select>
       ) : (
@@ -127,13 +73,9 @@ function FormField({
           placeholder={placeholder}
           min={min}
           max={max}
-          style={{
-            ...styles.input,
-            borderColor: error ? '#ef4444' : '#cbd5e1'
-          }}
+          style={inputStyle}
         />
       )}
-
       {error && (
         <p style={{ color: '#dc2626', fontSize: '0.75rem', margin: '4px 0 0' }}>
           {error}
@@ -146,43 +88,31 @@ function FormField({
 export default function FlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
-
   const user = authUtil.getUser();
   const flight = location.state?.flight || null;
   const selectedClass = location.state?.selectedClass || 'Economy';
-
   const passengerCount = Math.min(
-    27,
-    Math.max(1, Number(location.state?.passengerCount) || 1)
+    27, Math.max(1, Number(location.state?.passengerCount) || 1)
   );
-
   const initialCouponCode = location.state?.couponCode || '';
 
-  const [passengers, setPassengers] = useState(() => [
-    {
-      ...EMPTY_PASSENGER,
-      name: user?.fullName || '',
-      email: user?.email || '',
-      phone: user?.phoneNumber || ''
-    }
-  ]);
-
+  const [passengers, setPassengers] = useState(() => [{
+    ...EMPTY_PASSENGER,
+    name: user?.fullName || '',
+    email: user?.email || '',
+    phone: user?.phoneNumber || ''
+  }]);
   const [paymentMethod, setPaymentMethod] = useState('Credit Card');
-
   const [couponCode, setCouponCode] = useState(initialCouponCode);
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [appliedCoupons, setAppliedCoupons] = useState([]);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
-
-  const [passengerCoupons, setPassengerCoupons] = useState([]);
   const [couponsLoading, setCouponsLoading] = useState(true);
   const [couponsError, setCouponsError] = useState('');
-
   const [couponBalance, setCouponBalance] = useState(null);
   const [couponBalanceError, setCouponBalanceError] = useState('');
   const [redeemCouponPoints, setRedeemCouponPoints] = useState(false);
-
   const [formErrors, setFormErrors] = useState({});
   const [bookingError, setBookingError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -192,8 +122,7 @@ export default function FlightBooking() {
 
   if (!bookingRequestKeyRef.current) {
     bookingRequestKeyRef.current =
-      typeof crypto !== 'undefined' &&
-        typeof crypto.randomUUID === 'function'
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
         : `booking-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
@@ -201,11 +130,7 @@ export default function FlightBooking() {
   const loadPassengerCoupons = useCallback(async () => {
     try {
       setCouponsError('');
-      const response = await couponApi.getAvailable();
-
-      setPassengerCoupons(
-        Array.isArray(response.data) ? response.data : []
-      );
+      await couponApi.getAvailable();
     } catch (err) {
       setCouponsError(
         err.response?.data?.message || 'Unable to load available coupons.'
@@ -218,13 +143,11 @@ export default function FlightBooking() {
   const loadCouponBalance = useCallback(async () => {
     try {
       setCouponBalanceError('');
-
       const response = await couponApi.getBalance();
       setCouponBalance(response.data);
     } catch (err) {
       setCouponBalanceError(
-        err.response?.data?.message ||
-        'Unable to load your coupon point balance.'
+        err.response?.data?.message || 'Unable to load your coupon point balance.'
       );
     }
   }, []);
@@ -235,53 +158,33 @@ export default function FlightBooking() {
   }, [loadPassengerCoupons, loadCouponBalance]);
 
   const updatePassenger = (index, field, value) => {
-    setPassengers((previous) =>
-      previous.map((passenger, i) =>
-        i === index
-          ? { ...passenger, [field]: value }
-          : passenger
-      )
-    );
-
+    setPassengers((previous) => previous.map((passenger, i) =>
+      i === index ? { ...passenger, [field]: value } : passenger
+    ));
     setFormErrors((previous) => {
       const next = { ...previous };
-
       if (next[index]) {
         next[index] = { ...next[index] };
         delete next[index][field];
       }
-
       return next;
     });
   };
 
   const addPassenger = () => {
     if (passengers.length >= passengerCount) return;
-
-    setPassengers((previous) => [
-      ...previous,
-      { ...EMPTY_PASSENGER }
-    ]);
+    setPassengers((previous) => [...previous, { ...EMPTY_PASSENGER }]);
   };
 
   const removePassenger = (index) => {
-    setPassengers((previous) =>
-      previous.filter((_, i) => i !== index)
-    );
-
+    setPassengers((previous) => previous.filter((_, i) => i !== index));
     setFormErrors((previous) => {
       const next = {};
-
       Object.keys(previous).forEach((key) => {
         const oldIndex = Number(key);
-
-        if (oldIndex < index) {
-          next[oldIndex] = previous[oldIndex];
-        } else if (oldIndex > index) {
-          next[oldIndex - 1] = previous[oldIndex];
-        }
+        if (oldIndex < index) next[oldIndex] = previous[oldIndex];
+        if (oldIndex > index) next[oldIndex - 1] = previous[oldIndex];
       });
-
       return next;
     });
   };
@@ -290,120 +193,81 @@ export default function FlightBooking() {
     const errors = {};
 
     if (passengers.length !== passengerCount) {
-      setBookingError(
-        `Please add all ${passengerCount} passenger(s) before booking.`
-      );
+      setBookingError(`Please add all ${passengerCount} passenger(s) before booking.`);
       return false;
     }
 
     passengers.forEach((passenger, index) => {
       const err = {};
-
-      if (!passenger.name.trim()) {
-        err.name = 'Passenger name is required.';
-      }
-
+      if (!passenger.name.trim()) err.name = 'Passenger name is required.';
       if (
         !passenger.email.trim() ||
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passenger.email.trim())
-      ) {
-        err.email = 'Enter a valid email address.';
-      }
-
+      ) err.email = 'Enter a valid email address.';
       if (!passenger.phone.trim()) {
         err.phone = 'Phone number is required.';
-      } else if (
-        passenger.phone.replace(/\D/g, '').length < 7
-      ) {
+      } else if (passenger.phone.replace(/\D/g, '').length < 7) {
         err.phone = 'Enter a valid phone number.';
       }
 
       const age = Number(passenger.age);
-
-      if (
-        passenger.age === '' ||
-        !Number.isInteger(age) ||
-        age < 1 ||
-        age > 120
-      ) {
+      if (passenger.age === '' || !Number.isInteger(age) || age < 1 || age > 120) {
         err.age = 'Enter a valid age between 1 and 120.';
       }
-
-      if (!passenger.gender) {
-        err.gender = 'Select a gender.';
-      }
+      if (!passenger.gender) err.gender = 'Select a gender.';
 
       if (passenger.seat) {
         const seat = passenger.seat.trim().toUpperCase();
-
-        const duplicateSeat = passengers.some(
-          (other, otherIndex) =>
-            otherIndex !== index &&
-            other.seat.trim().toUpperCase() === seat
+        const duplicateSeat = passengers.some((other, otherIndex) =>
+          otherIndex !== index && other.seat.trim().toUpperCase() === seat
         );
-
-        if (duplicateSeat) {
-          err.seat = 'This seat is selected by another passenger.';
-        }
+        if (duplicateSeat) err.seat = 'This seat is selected by another passenger.';
       }
-
-      if (Object.keys(err).length > 0) {
-        errors[index] = err;
-      }
+      if (Object.keys(err).length) errors[index] = err;
     });
 
     setFormErrors(errors);
-
-    if (Object.keys(errors).length > 0) {
+    if (Object.keys(errors).length) {
       setBookingError('Please correct the passenger details.');
       return false;
     }
-
     return true;
   };
 
   const baseFarePerPassenger = Math.round(Number(flight?.price) || 0);
-
   const classFarePerPassenger = flight
     ? calculateClassFare(baseFarePerPassenger, selectedClass)
     : null;
-
   const originalFare =
-    classFarePerPassenger !== null &&
-      Number.isFinite(classFarePerPassenger)
+    classFarePerPassenger !== null && Number.isFinite(classFarePerPassenger)
       ? Math.round(classFarePerPassenger * passengerCount)
       : NaN;
+  const fareAvailable = Number.isFinite(originalFare) && originalFare > 0;
 
-  const fareAvailable =
-    Number.isFinite(originalFare) && originalFare > 0;
-
-  const discountAmount = appliedCoupon
-    ? Math.round(
-      Math.min(
-        Math.max(0, Number(appliedCoupon.discountAmount) || 0),
-        Number.isFinite(originalFare) ? originalFare : 0
-      )
-    )
-    : 0;
-
-  const availableCouponPoints = Math.max(
-    0,
-    Number(couponBalance?.availablePoints) || 0
+  // One coupon uses its full validated value; multiple coupons are added together.
+  // The total discount is capped at the total ticket fare.
+  const rawCouponDiscount = appliedCoupons.reduce(
+    (sum, coupon) => sum + Math.max(0, Number(coupon.discountAmount) || 0),
+    0
+  );
+  const discountAmount = Math.round(Math.min(
+    rawCouponDiscount,
+    Number.isFinite(originalFare) ? Math.max(0, originalFare) : 0
+  ));
+  const remainingFare = Math.max(
+    0, (Number.isFinite(originalFare) ? originalFare : 0) - discountAmount
   );
 
-  const remainingFare = Math.max(0, (originalFare || 0) - discountAmount);
-
-  const availablePointsDiscount = appliedCoupon
-    ? 0
-    : Math.floor(
-      Math.min(availableCouponPoints / 10, remainingFare)
-    );
-
+  const availableCouponPoints = Math.max(
+    0, Number(couponBalance?.availablePoints) || 0
+  );
+  const availablePointsDiscount = Math.floor(
+    Math.min(availableCouponPoints / 10, remainingFare)
+  );
   const pointsDiscountAmount =
-    redeemCouponPoints && !appliedCoupon
+    redeemCouponPoints && appliedCoupons.length === 0
       ? availablePointsDiscount
       : 0;
-
   const totalAmount = Math.max(
     0,
     Math.round(
@@ -414,15 +278,20 @@ export default function FlightBooking() {
   );
 
   const handleApplyCoupon = async (codeToApply) => {
-    const code = (codeToApply ?? couponCode).trim().toUpperCase();
+    const code = String(codeToApply ?? couponCode).trim().toUpperCase();
 
     if (!code) {
       setCouponError('Please enter a coupon code.');
       return;
     }
-
     if (!flight?.flightId) {
       setCouponError('Flight details are missing.');
+      return;
+    }
+    if (appliedCoupons.some((coupon) =>
+      coupon.couponCode?.toUpperCase() === code
+    )) {
+      setCouponError('This coupon is already applied.');
       return;
     }
 
@@ -432,29 +301,28 @@ export default function FlightBooking() {
 
     try {
       const response = await couponApi.validate(
-        code,
-        flight.flightId,
-        selectedClass,
-        passengerCount
+        code, flight.flightId, selectedClass, passengerCount
       );
-
       const data = response.data;
 
       if (data?.isValid) {
-        setAppliedCoupon({
+        const validatedCoupon = {
           ...data,
           couponCode: data.couponCode || code
+        };
+        setAppliedCoupons((previous) => {
+          if (previous.some((coupon) =>
+            coupon.couponCode?.toUpperCase() === code
+          )) return previous;
+          return [...previous, validatedCoupon];
         });
-
-        setCouponCode(code);
+        setCouponCode('');
         setRedeemCouponPoints(false);
-        setCouponSuccess(data.message || 'Coupon applied successfully.');
+        setCouponSuccess(data.message || `${code} applied successfully.`);
       } else {
-        setAppliedCoupon(null);
         setCouponError(data?.message || 'This coupon is not valid.');
       }
     } catch (err) {
-      setAppliedCoupon(null);
       setCouponError(
         err.response?.data?.message || 'Failed to validate coupon.'
       );
@@ -463,8 +331,14 @@ export default function FlightBooking() {
     }
   };
 
-  const handleRemoveCoupon = () => {
-    setAppliedCoupon(null);
+  const handleRemoveCoupon = (codeToRemove) => {
+    if (codeToRemove) {
+      setAppliedCoupons((previous) => previous.filter((coupon) =>
+        coupon.couponCode?.toUpperCase() !== codeToRemove.toUpperCase()
+      ));
+    } else {
+      setAppliedCoupons([]);
+    }
     setCouponCode('');
     setCouponSuccess('');
     setCouponError('');
@@ -472,57 +346,39 @@ export default function FlightBooking() {
 
   const handleConfirmBooking = async (event) => {
     event.preventDefault();
-
     if (submittingRef.current) return;
 
     setBookingError('');
-
     if (!flight?.flightId) {
       setBookingError('Flight details are missing. Please select a flight again.');
       return;
     }
-
     if (!fareAvailable) {
       setBookingError('The fare is unavailable. Please select another flight or contact the administrator.');
       return;
     }
-
-    if (!validatePassengers()) {
-      return;
-    }
+    if (!validatePassengers()) return;
 
     submittingRef.current = true;
     setSubmitting(true);
 
     try {
       const firstPassenger = passengers[0];
-
-      // Keep the first passenger's fields at the top level for
-      // compatibility with APIs that expect the existing booking DTO.
       const payload = {
         idempotencyKey: bookingRequestKeyRef.current,
-
         flightId: flight.flightId,
-
         passengerName: firstPassenger.name.trim(),
         passengerEmail: firstPassenger.email.trim(),
         passengerPhone: firstPassenger.phone.trim(),
         passengerAge: Number(firstPassenger.age),
         passengerGender: firstPassenger.gender,
         seatNumber: firstPassenger.seat.trim().toUpperCase(),
-
         class: selectedClass,
         passengerCount,
         paymentMethod,
-
-        couponCode: appliedCoupon
-          ? appliedCoupon.couponCode
-          : undefined,
-
-        redeemCouponPoints,
-
-        // Your backend DTO must support this field for multi-passenger
-        // bookings to persist every passenger's information.
+        couponCode: appliedCoupons[0]?.couponCode || undefined,
+        couponCodes: appliedCoupons.map((coupon) => coupon.couponCode),
+        redeemCouponPoints: pointsDiscountAmount > 0,
         passengers: passengers.map((passenger) => ({
           name: passenger.name.trim(),
           email: passenger.email.trim(),
@@ -533,32 +389,19 @@ export default function FlightBooking() {
         }))
       };
 
-      console.log('Submitting booking:', payload);
-
       const response = await bookingApi.create(payload);
-
       const confirmedBooking = response.data;
-
       if (!confirmedBooking) {
-        throw new Error(
-          'The booking API returned no booking details.'
-        );
+        throw new Error('The booking API returned no booking details.');
       }
 
-      console.log('Booking successful:', confirmedBooking);
-
-      // Coupon refresh is separate from booking confirmation.
-      // A coupon API error must not prevent successful navigation.
       let couponPageData = null;
       let couponRefreshError = '';
-
       try {
-        const [couponsResponse, statisticsResponse] =
-          await Promise.all([
-            couponApi.getAll(),
-            couponApi.getStatistics()
-          ]);
-
+        const [couponsResponse, statisticsResponse] = await Promise.all([
+          couponApi.getAll(),
+          couponApi.getStatistics()
+        ]);
         couponPageData = {
           coupons: couponsResponse.data,
           statistics: statisticsResponse.data
@@ -572,25 +415,18 @@ export default function FlightBooking() {
       try {
         await loadCouponBalance();
       } catch {
-        // Balance refresh must not block navigation.
+        // Balance refresh must not block successful navigation.
       }
 
       navigate('/booking-confirmation', {
-        state: {
-          booking: confirmedBooking,
-          couponPageData,
-          couponRefreshError
-        },
+        state: { booking: confirmedBooking, couponPageData, couponRefreshError },
         replace: true
       });
     } catch (err) {
       console.error('Booking error:', err);
       console.error('Backend response:', err.response?.data);
-
       setBookingError(
-        err.response?.data?.message ||
-        err.message ||
-        'Booking failed. Please try again.'
+        err.response?.data?.message || err.message || 'Booking failed. Please try again.'
       );
     } finally {
       submittingRef.current = false;
@@ -616,81 +452,44 @@ export default function FlightBooking() {
   }
 
   return (
-    <div
-      className="animate-fade-in"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 24,
-        color: '#0f172a'
-      }}
-    >
+    <div className="animate-fade-in" style={{
+      display: 'flex', flexDirection: 'column', gap: 24, color: '#0f172a'
+    }}>
       <style>{`
         .booking-grid {
           display: grid;
           grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
-          gap: 24px;
-          align-items: start;
+          gap: 24px; align-items: start;
         }
-
         .booking-two-fields {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
+          display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;
         }
-
         .booking-three-fields {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 14px;
+          display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;
         }
-
         .booking-seat {
-          padding: 7px 10px;
-          border-radius: 7px;
-          border: 1px solid #cbd5e1;
-          background: #f8fafc;
-          cursor: pointer;
-          font-weight: 600;
+          padding: 7px 10px; border-radius: 7px; border: 1px solid #cbd5e1;
+          background: #f8fafc; cursor: pointer; font-weight: 600;
         }
-
-        .booking-seat:disabled {
-          opacity: 0.35;
-          cursor: not-allowed;
-        }
-
+        .booking-seat:disabled { opacity: 0.35; cursor: not-allowed; }
         @media (max-width: 990px) {
-          .booking-grid {
-            grid-template-columns: minmax(0, 1fr);
-          }
+          .booking-grid { grid-template-columns: minmax(0, 1fr); }
         }
-
         @media (max-width: 600px) {
-          .booking-two-fields,
-          .booking-three-fields {
+          .booking-two-fields, .booking-three-fields {
             grid-template-columns: minmax(0, 1fr);
           }
         }
       `}</style>
 
       <div>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            color: '#64748b',
-            fontSize: '0.85rem',
-            marginBottom: 8
-          }}
-        >
-          <span>Flights</span>
-          <ChevronRight size={14} />
-          <span style={{ color: '#0284c7', fontWeight: 700 }}>
-            Booking Checkout
-          </span>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, color: '#64748b',
+          fontSize: '0.85rem', marginBottom: 8
+        }}>
+          <span>Flights</span><ChevronRight size={14} />
+          <span style={{ color: '#0284c7', fontWeight: 700 }}>Booking Checkout</span>
         </div>
-
         <h1 style={{ fontSize: '1.7rem', fontWeight: 800, margin: 0 }}>
           Complete Flight Reservation
         </h1>
@@ -698,88 +497,52 @@ export default function FlightBooking() {
 
       {bookingError && (
         <div role="alert" style={styles.error}>
-          <AlertCircle
-            size={18}
-            style={{ verticalAlign: 'middle', marginRight: 8 }}
-          />
+          <AlertCircle size={18} style={{ verticalAlign: 'middle', marginRight: 8 }} />
           {bookingError}
         </div>
       )}
 
       <div className="booking-grid">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Flight details */}
           <section style={styles.card}>
-            <div
-              style={{
-                display: 'flex',
-                gap: 12,
-                alignItems: 'center',
-                marginBottom: 18
-              }}
-            >
+            <div style={{
+              display: 'flex', gap: 12, alignItems: 'center', marginBottom: 18
+            }}>
               <Plane size={28} color="#0284c7" />
               <div>
-                <h2 style={{ fontSize: '1.1rem', margin: 0 }}>
-                  {flight.airline}
-                </h2>
+                <h2 style={{ fontSize: '1.1rem', margin: 0 }}>{flight.airline}</h2>
                 <span style={{ color: '#64748b', fontSize: '0.82rem' }}>
                   Flight #{flight.flightNumber}
                 </span>
               </div>
             </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr auto 1fr',
-                alignItems: 'center',
-                gap: 12,
-                padding: 16,
-                borderRadius: 12,
-                background: '#f8fafc'
-              }}
-            >
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr auto 1fr',
+              alignItems: 'center', gap: 12, padding: 16, borderRadius: 12,
+              background: '#f8fafc'
+            }}>
               <div>
-                <strong style={{ fontSize: '1.2rem' }}>
-                  {flight.departureTime}
-                </strong>
+                <strong style={{ fontSize: '1.2rem' }}>{flight.departureTime}</strong>
                 <div>{flight.fromCity}</div>
-                <small style={{ color: '#64748b' }}>
-                  {flight.departureDate}
-                </small>
+                <small style={{ color: '#64748b' }}>{flight.departureDate}</small>
               </div>
-
               <div style={{ textAlign: 'center', color: '#64748b' }}>
                 <Clock size={15} />
-                <div style={{ fontSize: '0.8rem' }}>
-                  {flight.duration}
-                </div>
+                <div style={{ fontSize: '0.8rem' }}>{flight.duration}</div>
                 <div style={{ marginTop: 6 }}>
-                  {flight.distanceKm
-                    ? `${flight.distanceKm} km`
-                    : 'Distance unavailable'}
+                  {flight.distanceKm ? `${flight.distanceKm} km` : 'Distance unavailable'}
                 </div>
               </div>
-
               <div style={{ textAlign: 'right' }}>
-                <strong style={{ fontSize: '1.2rem' }}>
-                  {flight.arrivalTime}
-                </strong>
+                <strong style={{ fontSize: '1.2rem' }}>{flight.arrivalTime}</strong>
                 <div>{flight.toCity}</div>
-                <small style={{ color: '#64748b' }}>
-                  {flight.arrivalDate}
-                </small>
+                <small style={{ color: '#64748b' }}>{flight.arrivalDate}</small>
               </div>
             </div>
           </section>
 
-          {/* Passenger form */}
           <section style={styles.card}>
-            <h2 style={{ fontSize: '1.15rem', marginTop: 0 }}>
-              Passenger Details
-            </h2>
-
+            <h2 style={{ fontSize: '1.15rem', marginTop: 0 }}>Passenger Details</h2>
             <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
               Add details for all {passengerCount} passenger(s).
             </p>
@@ -790,174 +553,80 @@ export default function FlightBooking() {
                 const selectedSeat = passenger.seat.trim().toUpperCase();
 
                 return (
-                  <div
-                    key={index}
-                    style={{
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 12,
-                      padding: 16
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: 16
-                      }}
-                    >
+                  <div key={index} style={{
+                    border: '1px solid #e2e8f0', borderRadius: 12, padding: 16
+                  }}>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between',
+                      alignItems: 'center', marginBottom: 16
+                    }}>
                       <h3 style={{ margin: 0, fontSize: '1rem' }}>
-                        <User
-                          size={17}
-                          style={{ verticalAlign: 'middle', marginRight: 6 }}
-                        />
+                        <User size={17} style={{ verticalAlign: 'middle', marginRight: 6 }} />
                         Passenger {index + 1}
                       </h3>
-
                       {index > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => removePassenger(index)}
-                          style={{
-                            border: 0,
-                            background: 'transparent',
-                            color: '#dc2626',
-                            cursor: 'pointer'
-                          }}
-                        >
+                        <button type="button" onClick={() => removePassenger(index)} style={{
+                          border: 0, background: 'transparent', color: '#dc2626', cursor: 'pointer'
+                        }}>
                           Remove
                         </button>
                       )}
                     </div>
 
                     <div style={{ marginBottom: 14 }}>
-                      <FormField
-                        label="Full Name *"
-                        value={passenger.name}
-                        placeholder="Enter passenger name"
-                        error={errors.name}
-                        onChange={(e) =>
-                          updatePassenger(index, 'name', e.target.value)
-                        }
-                      />
+                      <FormField label="Full Name *" value={passenger.name}
+                        placeholder="Enter passenger name" error={errors.name}
+                        onChange={(e) => updatePassenger(index, 'name', e.target.value)} />
                     </div>
 
                     <div className="booking-two-fields" style={{ marginBottom: 14 }}>
-                      <FormField
-                        label="Email Address *"
-                        type="email"
-                        value={passenger.email}
-                        placeholder="Enter email"
-                        error={errors.email}
-                        onChange={(e) =>
-                          updatePassenger(index, 'email', e.target.value)
-                        }
-                      />
-
-                      <FormField
-                        label="Phone Number *"
-                        type="tel"
-                        value={passenger.phone}
-                        placeholder="+91 98765 43210"
-                        error={errors.phone}
-                        onChange={(e) =>
-                          updatePassenger(index, 'phone', e.target.value)
-                        }
-                      />
+                      <FormField label="Email Address *" type="email" value={passenger.email}
+                        placeholder="Enter email" error={errors.email}
+                        onChange={(e) => updatePassenger(index, 'email', e.target.value)} />
+                      <FormField label="Phone Number *" type="tel" value={passenger.phone}
+                        placeholder="+91 98765 43210" error={errors.phone}
+                        onChange={(e) => updatePassenger(index, 'phone', e.target.value)} />
                     </div>
 
                     <div className="booking-three-fields">
-                      <FormField
-                        label="Age *"
-                        type="number"
-                        min="1"
-                        max="120"
-                        value={passenger.age}
-                        placeholder="Age"
-                        error={errors.age}
-                        onChange={(e) =>
-                          updatePassenger(index, 'age', e.target.value)
-                        }
-                      />
-
-                      <FormField
-                        label="Gender *"
-                        value={passenger.gender}
-                        options={['Male', 'Female', 'Other']}
-                        error={errors.gender}
-                        onChange={(e) =>
-                          updatePassenger(index, 'gender', e.target.value)
-                        }
-                      />
-
-                      <FormField
-                        label="Seat (Optional)"
-                        value={passenger.seat}
-                        placeholder="e.g. 14B"
-                        error={errors.seat}
-                        onChange={(e) =>
-                          updatePassenger(
-                            index,
-                            'seat',
-                            e.target.value.toUpperCase()
-                          )
-                        }
-                      />
+                      <FormField label="Age *" type="number" min="1" max="120"
+                        value={passenger.age} placeholder="Age" error={errors.age}
+                        onChange={(e) => updatePassenger(index, 'age', e.target.value)} />
+                      <FormField label="Gender *" value={passenger.gender}
+                        options={['Male', 'Female', 'Other']} error={errors.gender}
+                        onChange={(e) => updatePassenger(index, 'gender', e.target.value)} />
+                      <FormField label="Seat (Optional)" value={passenger.seat}
+                        placeholder="e.g. 14B" error={errors.seat}
+                        onChange={(e) => updatePassenger(index, 'seat', e.target.value.toUpperCase())} />
                     </div>
 
                     <div style={{ marginTop: 14 }}>
-                      <span
-                        style={{
-                          display: 'block',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          marginBottom: 8,
-                          color: '#475569'
-                        }}
-                      >
-                        Select a sample seat
-                      </span>
-
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: 6
-                        }}
-                      >
+                      <span style={{
+                        display: 'block', fontSize: '0.8rem', fontWeight: 600,
+                        marginBottom: 8, color: '#475569'
+                      }}>Select a sample seat</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {SAMPLE_SEATS.map((seat) => {
-                          const takenByOther = passengers.some(
-                            (other, otherIndex) =>
-                              otherIndex !== index &&
-                              other.seat.trim().toUpperCase() === seat
+                          const takenByOther = passengers.some((other, otherIndex) =>
+                            otherIndex !== index && other.seat.trim().toUpperCase() === seat
                           );
-
                           const selected = selectedSeat === seat;
-
                           return (
-                            <button
-                              type="button"
-                              key={seat}
-                              disabled={takenByOther}
+                            <button type="button" key={seat} disabled={takenByOther}
                               className="booking-seat"
-                              onClick={() =>
-                                updatePassenger(index, 'seat', seat)
-                              }
+                              onClick={() => updatePassenger(index, 'seat', seat)}
                               style={{
                                 borderColor: selected ? '#0284c7' : '#cbd5e1',
                                 background: selected ? '#e0f2fe' : '#f8fafc',
                                 color: selected ? '#0369a1' : '#334155'
-                              }}
-                            >
+                              }}>
                               {seat}
                             </button>
                           );
                         })}
                       </div>
-
                       <small style={{ color: '#64748b' }}>
-                        Sample seats only. Actual seat availability must be
-                        verified by the backend.
+                        Sample seats only. Actual seat availability must be verified by the backend.
                       </small>
                     </div>
                   </div>
@@ -965,59 +634,37 @@ export default function FlightBooking() {
               })}
 
               {passengers.length < passengerCount && (
-                <button
-                  type="button"
-                  onClick={addPassenger}
-                  style={{
-                    ...styles.primaryButton,
-                    background: '#f0f9ff',
-                    color: '#0369a1',
-                    border: '1px dashed #0284c7'
-                  }}
-                >
+                <button type="button" onClick={addPassenger} style={{
+                  ...styles.primaryButton, background: '#f0f9ff', color: '#0369a1',
+                  border: '1px dashed #0284c7'
+                }}>
                   + Add Passenger ({passengers.length}/{passengerCount})
                 </button>
               )}
-
               <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569' }}>
                 Passenger details added: {passengers.length}/{passengerCount}
               </p>
             </div>
 
             <div style={{ marginTop: 24 }}>
-              <h3 style={{ fontSize: '1rem', marginBottom: 12 }}>
-                Payment Method
-              </h3>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                  gap: 10
-                }}
-              >
+              <h3 style={{ fontSize: '1rem', marginBottom: 12 }}>Payment Method</h3>
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                gap: 10
+              }}>
                 {PAYMENT_METHODS.map((method) => (
-                  <button
-                    type="button"
-                    key={method}
+                  <button type="button" key={method}
                     onClick={() => setPaymentMethod(method)}
                     aria-pressed={paymentMethod === method}
                     style={{
-                      padding: 12,
-                      borderRadius: 10,
-                      border: paymentMethod === method
-                        ? '2px solid #0284c7'
-                        : '1px solid #e2e8f0',
+                      padding: 12, borderRadius: 10,
+                      border: paymentMethod === method ? '2px solid #0284c7' : '1px solid #e2e8f0',
                       background: paymentMethod === method ? '#f0f9ff' : '#fff',
                       color: paymentMethod === method ? '#0369a1' : '#475569',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
+                      fontWeight: 600, cursor: 'pointer'
+                    }}>
                     <CreditCard size={19} />
-                    <div style={{ marginTop: 6, fontSize: '0.8rem' }}>
-                      {method}
-                    </div>
+                    <div style={{ marginTop: 6, fontSize: '0.8rem' }}>{method}</div>
                   </button>
                 ))}
               </div>
@@ -1028,190 +675,141 @@ export default function FlightBooking() {
           </section>
         </div>
 
-        {/* Coupons and fare summary */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           <section style={styles.card}>
-            <h2
-              style={{
-                fontSize: '1.1rem',
-                display: 'flex',
-                gap: 8,
-                alignItems: 'center',
-                marginTop: 0,
-                marginBottom: 16
-              }}
-            >
-              <Tag size={20} color="#0284c7" />
-              Apply Promo Coupon
+            <h2 style={{
+              fontSize: '1.1rem', display: 'flex', gap: 8, alignItems: 'center',
+              marginTop: 0, marginBottom: 16
+            }}>
+              <Tag size={20} color="#0284c7" /> Apply Promo Coupon
             </h2>
 
+            <div style={{ marginBottom: 15 }}>
+              <p style={{
+                fontSize: '0.78rem', fontWeight: 600, textTransform: 'uppercase',
+                letterSpacing: '0.08em', marginBottom: 5
+              }}>Available Points</p>
+              <p style={{
+                fontSize: '0.88rem', fontWeight: 900, margin: '0 0 5px', lineHeight: 1.1
+              }}>
+                {couponsLoading || !couponBalance
+                  ? '…'
+                  : Math.round(Number(couponBalance.availablePoints) || 0).toLocaleString()}
+              </p>
+              <p style={{ fontSize: '0.85rem', fontWeight: 500, color: 'blue', margin: 0 }}>
+                ≈ ₹ {couponsLoading || !couponBalance
+                  ? '…'
+                  : Number(
+                    couponBalance.availableDiscountAmount ??
+                    ((Number(couponBalance.availablePoints) || 0) / 10)
+                  ).toFixed(2)} Cash Equivalent
+              </p>
+              {couponsError && <p role="alert" style={{ color: '#dc2626', fontSize: '0.8rem' }}>{couponsError}</p>}
+              {couponBalanceError && <p role="alert" style={{ color: '#dc2626', fontSize: '0.8rem' }}>{couponBalanceError}</p>}
+            </div>
 
+            {appliedCoupons.map((coupon) => (
+              <div key={coupon.couponCode} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                gap: 8, color: '#059669', marginBottom: 8
+              }}>
+                <span style={{ overflowWrap: 'anywhere' }}>{coupon.couponCode}</span>
+                <strong>{formatINR(Number(coupon.discountAmount) || 0)}</strong>
+                <button type="button" onClick={() => handleRemoveCoupon(coupon.couponCode)}
+                  style={{
+                    border: 0, background: 'transparent', color: '#dc2626', cursor: 'pointer'
+                  }}>Remove</button>
+              </div>
+            ))}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleApplyCoupon();
-              }}
-            >
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              handleApplyCoupon();
+            }}>
               <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="text"
-                  value={couponCode}
+                <input type="text" value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                   placeholder="Enter coupon code"
-                  style={{ ...styles.input, minWidth: 0, flex: 1 }}
-                />
-
-                <button
-                  type="submit"
-                  disabled={couponLoading}
-                  style={{
-                    ...styles.primaryButton,
-                    width: 'auto',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
+                  style={{ ...styles.input, minWidth: 0, flex: 1 }} />
+                <button type="submit" disabled={couponLoading} style={{
+                  ...styles.primaryButton, width: 'auto', whiteSpace: 'nowrap',
+                  opacity: couponLoading ? 0.6 : 1
+                }}>
                   {couponLoading ? 'Checking...' : 'Apply'}
                 </button>
               </div>
             </form>
 
             {couponSuccess && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 10,
-                  background: '#ecfdf5',
-                  color: '#047857',
-                  borderRadius: 8,
-                  fontSize: '0.82rem'
-                }}
-              >
+              <div style={{
+                margin: '10px 0', padding: 10, background: '#ecfdf5',
+                color: '#047857', borderRadius: 8, fontSize: '0.82rem'
+              }}>
                 <CheckCircle size={15} style={{ verticalAlign: 'middle' }} />{' '}
                 {couponSuccess}
-                <button
-                  type="button"
-                  onClick={handleRemoveCoupon}
-                  style={{
-                    display: 'block',
-                    marginTop: 8,
-                    border: 0,
-                    color: '#dc2626',
-                    background: 'transparent',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Remove coupon
-                </button>
               </div>
             )}
-
             {couponError && (
               <p role="alert" style={{ color: '#dc2626', fontSize: '0.82rem' }}>
                 {couponError}
               </p>
             )}
+            {appliedCoupons.length > 0 && (
+              <button type="button" onClick={() => handleRemoveCoupon()} style={{
+                marginTop: 8, border: 0, color: '#dc2626',
+                background: 'transparent', cursor: 'pointer'
+              }}>
+                Remove all coupons
+              </button>
+            )}
 
-            <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 18, paddingTop: 16 }}>
-              <h3 style={{ fontSize: '0.95rem' }}>Available Coupons</h3>
-
-              {couponsLoading && (
-                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
-                  Loading coupons...
-                </p>
-              )}
-
-              {couponsError && (
-                <p style={{ color: '#dc2626', fontSize: '0.82rem' }}>
-                  {couponsError}
-                </p>
-              )}
-
-              {!couponsLoading && !couponsError && passengerCoupons.length === 0 && (
-                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
-                  No available coupons.
-                </p>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {passengerCoupons.map((coupon) => (
-                  <div
-                    key={coupon.couponId}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 10,
-                      padding: 12,
-                      borderRadius: 10,
-                      border: '1px solid #bbf7d0',
-                      background: '#f0fdf4'
-                    }}
-                  >
-                    <div style={{ minWidth: 0 }}>
-                      <strong style={{ fontSize: '0.85rem' }}>
-                        {coupon.couponCode}
-                      </strong>
-                      <div style={{ fontSize: '0.8rem', color: '#475569' }}>
-                        {formatINR(
-                          Number(coupon.discountAmount ?? coupon.discountValue) || 0
-                        )} off
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={couponLoading}
-                      onClick={() => handleApplyCoupon(coupon.couponCode)}
-                      style={{
-                        ...styles.primaryButton,
-                        width: 'auto',
-                        padding: '8px 12px',
-                        fontSize: '0.8rem'
-                      }}
-                    >
-                      Apply
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 8, marginTop: 16,
+              color: appliedCoupons.length ? '#94a3b8' : '#334155', fontSize: '0.88rem'
+            }}>
+              <input type="checkbox"
+                checked={redeemCouponPoints}
+                disabled={appliedCoupons.length > 0 || availableCouponPoints <= 0}
+                onChange={(e) => setRedeemCouponPoints(e.target.checked)} />
+              Redeem available points (10 points = ₹1)
+            </label>
+            {appliedCoupons.length > 0 && (
+              <small style={{ display: 'block', color: '#64748b', marginTop: 5 }}>
+                Remove applied coupons to redeem points separately.
+              </small>
+            )}
           </section>
 
           <section style={styles.card}>
-            <h2 style={{ fontSize: '1.1rem', marginTop: 0 }}>
-              Fare Breakdown
-            </h2>
-
+            <h2 style={{ fontSize: '1.1rem', marginTop: 0 }}>Fare Breakdown</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                 <span style={{ color: '#475569' }}>Traveller class</span>
                 <strong>{selectedClass}</strong>
               </div>
-
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                 <span style={{ color: '#475569' }}>Base fare per passenger</span>
                 <strong>{formatINR(baseFarePerPassenger)}</strong>
               </div>
-
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ color: '#475569' }}>
-                  Total fare ({passengerCount} passenger(s))
-                </span>
-                <strong>
-                  {fareAvailable ? formatINR(originalFare) : 'Unavailable'}
-                </strong>
+                <span style={{ color: '#475569' }}>Total fare ({passengerCount} passenger(s))</span>
+                <strong>{fareAvailable ? formatINR(originalFare) : 'Unavailable'}</strong>
               </div>
 
+              {appliedCoupons.map((coupon) => (
+                <div key={coupon.couponCode} style={{
+                  display: 'flex', justifyContent: 'space-between', gap: 12, color: '#059669'
+                }}>
+                  <span style={{ overflowWrap: 'anywhere' }}>{coupon.couponCode}</span>
+                  <strong>-{formatINR(Math.max(0, Number(coupon.discountAmount) || 0))}</strong>
+                </div>
+              ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#059669' }}>
-                <span>
-                  Coupon discount
-                  {appliedCoupon ? ` (${appliedCoupon.couponCode})` : ''}
-                </span>
+                <span>Total coupon discount</span>
                 <strong>-{formatINR(discountAmount)}</strong>
               </div>
 
-              {redeemCouponPoints && !appliedCoupon && (
+              {redeemCouponPoints && appliedCoupons.length === 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, color: '#059669' }}>
                   <span>Points discount</span>
                   <strong>-{formatINR(pointsDiscountAmount)}</strong>
@@ -1219,14 +817,10 @@ export default function FlightBooking() {
               )}
 
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 12
-                  }}
-                >
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  alignItems: 'center', gap: 12
+                }}>
                   <strong>Final Payable Amount</strong>
                   <strong style={{ fontSize: '1.5rem', color: '#0284c7' }}>
                     {fareAvailable ? formatINR(totalAmount) : 'Unavailable'}
@@ -1235,42 +829,23 @@ export default function FlightBooking() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleConfirmBooking}
+            <button type="button" onClick={handleConfirmBooking}
               disabled={submitting || !fareAvailable}
               style={{
-                ...styles.primaryButton,
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: 8,
-                marginTop: 22,
+                ...styles.primaryButton, display: 'flex', justifyContent: 'center',
+                alignItems: 'center', gap: 8, marginTop: 22,
                 opacity: submitting || !fareAvailable ? 0.6 : 1,
                 cursor: submitting || !fareAvailable ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {submitting ? (
-                'Processing Reservation...'
-              ) : (
-                <>
-                  Confirm Booking ({formatINR(totalAmount)})
-                  <ArrowRight size={18} />
-                </>
+              }}>
+              {submitting ? 'Processing Reservation...' : (
+                <>Confirm Booking ({formatINR(totalAmount)}) <ArrowRight size={18} /></>
               )}
             </button>
 
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                color: '#64748b',
-                fontSize: '0.75rem',
-                marginTop: 14
-              }}
-            >
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: 6, color: '#64748b', fontSize: '0.75rem', marginTop: 14
+            }}>
               <ShieldCheck size={15} color="#059669" />
               <span>Booking confirmation after successful API response</span>
             </div>

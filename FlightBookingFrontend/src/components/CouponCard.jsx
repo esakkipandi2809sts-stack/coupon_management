@@ -34,7 +34,7 @@ export default function CouponCard({ coupon, onApply }) {
         backgroundColor: '#ffffff',
         borderRadius: '16px',
         border: '1px solid #e2e8f0',
-        padding: '20px',
+        padding: '18px',
         boxShadow: '0 4px 15px rgba(0, 0, 0, 0.04)',
         display: 'flex',
         flexDirection: 'column',
