@@ -43,8 +43,8 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
         boxShadow: '0 4px 15px rgba(0,0,0,0.04)'
       }}
     >
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>
+      <div style={{ overflowX: 'auto' }} className="ac-list-scroll">
+        <table className='ac-flights-table' style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>
           <thead>
             <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Booking ID</th>
