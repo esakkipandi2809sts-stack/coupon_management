@@ -121,11 +121,11 @@ input, select, textarea {
   border: 1px solid #fde68a;
 }
 
-/* New badge for Rescheduled - blue */
+/* New badge for Rescheduled - purple */
 .badge-rescheduled {
-  background-color: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #bfdbfe;
+  background-color: #f5f3ff;
+  color: #7c3aed;
+  border: 1px solid #ddd6fe;
 }
 
 /* Updated badge for Failed - orange */
