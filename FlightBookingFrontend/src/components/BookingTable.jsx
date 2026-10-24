@@ -66,7 +66,7 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Seat & Class</th>
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Amount</th>
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Status</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569', textAlign: 'right' }}>Actions</th>
+              <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -109,22 +109,15 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
 
                 {/* Seat & Class */}
                 <td style={{ padding: '16px 18px' }}>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      backgroundColor: '#f1f5f9',
-                      fontWeight: 700,
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '0.8rem',
-                      color: '#0f172a',
-                      marginRight: '6px'
-                    }}
-                  >
-                    {b.seatNumber}
-                  </span>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{b.class}</span>
+                  <span style={{
+                    fontWeight: 600, color: '#0f172a', padding: '2px 8px',
+                    borderRadius: '6px',
+                    backgroundColor: '#d5d5d5',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.8rem',
+                    color: '#0f172a',
+                  }}>{b.seatNumber}</span>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{b.class}</div>
                 </td>
 
                 {/* Amount */}
@@ -153,50 +146,50 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
 
 
-                    {isActiveBooking(b) && onReschedule && (
-                      <button
-                        onClick={() => onReschedule(b)}
-                        title="Reschedule Booking"
-                        className="badge-Reschedule"
-                        style={{
-                          padding: '6px 10px',
-                          borderRadius: '8px',
-                          backgroundColor: '#f5f3ff',
-                          color: '#7c3aed',
-                          border: '1px solid #ddd6fe',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '0.78rem',
-                          fontWeight: 600
-                        }}
-                      >
-                        <CalendarClock size={14} />
-                        <span>Reschedule</span>
-                      </button>
-                    )}
+                      {isActiveBooking(b) && onReschedule && (
+                        <button
+                          onClick={() => onReschedule(b)}
+                          title="Reschedule Booking"
+                          className="badge-Reschedule"
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            backgroundColor: '#f5f3ff',
+                            color: '#7c3aed',
+                            border: '1px solid #ddd6fe',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600
+                          }}
+                        >
+                          <CalendarClock size={14} />
+                          <span>Reschedule</span>
+                        </button>
+                      )}
 
-                    {isActiveBooking(b) && (
-                      <button
-                        onClick={() => onCancel(b.bookingId)}
-                        title="Cancel Booking"
-                        style={{
-                          padding: '6px 10px',
-                          borderRadius: '8px',
-                          color: '#dc2626',
-                          backgroundColor: '#fef2f2',
-                          border: '1px solid #fecaca',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '0.78rem',
-                          fontWeight: 600
-                        }}
-                      >
-                        <XCircle size={14} />
-                        <span>Cancel</span>
-                      </button>
-                    )}
+                      {isActiveBooking(b) && (
+                        <button
+                          onClick={() => onCancel(b.bookingId)}
+                          title="Cancel Booking"
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '8px',
+                            color: '#dc2626',
+                            backgroundColor: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600
+                          }}
+                        >
+                          <XCircle size={14} />
+                          <span>Cancel</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </td>
