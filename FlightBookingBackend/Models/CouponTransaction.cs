@@ -13,8 +13,7 @@ namespace FlightBookingBackend.Models
         [Required]
         public int UserId { get; set; }
 
-        [Required]
-        public int BookingId { get; set; }
+        public int? BookingId { get; set; }
 
         [Required]
         [MaxLength(20)]

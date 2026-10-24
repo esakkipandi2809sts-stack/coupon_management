@@ -193,5 +193,30 @@ namespace FlightBookingBackend.Controllers
                 return StatusCode(500, new { message = "Error calculating coupon statistics." });
             }
         }
+        [Authorize]
+        [HttpPost("create-from-points")]
+        public async Task<IActionResult> CreateCouponFromPoints([FromBody] CreateCouponFromPointsDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdClaim, out var userId))
+                return Unauthorized(new { message = "Invalid user context." });
+
+            try
+            {
+                var (success, message, result) = await _couponService.CreateCouponFromPointsAsync(userId, request.Points);
+                if (!success)
+                    return BadRequest(new { message });
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating coupon from points for user {UserId}", userId);
+                return StatusCode(500, new { message = "Error creating coupon from points." });
+            }
+        }
     }
 }

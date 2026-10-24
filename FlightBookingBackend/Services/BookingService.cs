@@ -193,6 +193,8 @@ namespace FlightBookingBackend.Services
                 await _context.SaveChangesAsync();
 
                 Coupon? generatedCoupon = null;
+                var today = _couponService.GetBusinessDate();
+                var initialCouponStatus = flight.DepartureDate <= today ? "Available" : "Pending";
                 if (booking.BookingStatus == "Confirmed" &&
                     booking.PaymentStatus == "Paid")
                 {
@@ -213,7 +215,7 @@ namespace FlightBookingBackend.Services
                         ExpiryDate = now.AddYears(1),
                         TotalUsageLimit = 1,
                         UsedCount = 0,
-                        Status = "Pending",
+                        Status = initialCouponStatus,
                         CreatedAt = now,
                         UserId = userId,
                         GeneratedForBookingId = booking.BookingId,
@@ -240,6 +242,7 @@ namespace FlightBookingBackend.Services
 
                 if (pointsEarned > 0m)
                 {
+                    var earnedTxStatus = generatedCoupon?.Status ?? initialCouponStatus;
                     _context.CouponTransactions.Add(new CouponTransaction
                     {
                         UserId = userId,
@@ -247,7 +250,7 @@ namespace FlightBookingBackend.Services
                         TransactionType = "Earned",
                         Points = pointsEarned,
                         DiscountAmount = 0m,
-                        Status = "Available",
+                        Status = earnedTxStatus,
                         TransactionDate = booking.BookingDate
                     });
                 }
@@ -317,7 +320,7 @@ namespace FlightBookingBackend.Services
                     PointsRedeemed = pointsRedeemed,
                     PointsDiscountAmount = pointsDiscountAmount,
                     CouponPointsEarned = pointsEarned,
-                    AvailableCouponPoints = availableCouponPoints - pointsRedeemed + pointsEarned,
+                    AvailableCouponPoints = availableCouponPoints - pointsRedeemed + (initialCouponStatus == "Available" ? pointsEarned : 0m),
                     Taxes = taxes,
                     FinalAmount = finalAmount,
                     BookingStatus = booking.BookingStatus,
@@ -477,12 +480,12 @@ namespace FlightBookingBackend.Services
             return booking == null ? null : MapToDetailDto(booking);
         }
 
-        public async Task<(bool Success, string Message)> CancelBookingAsync(int bookingId, int userId)
+        public async Task<(bool Success, string Message)> CancelBookingAsync(int bookingId, int userId, bool isAdmin = false)
         {
             using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
             var booking = await _context.Bookings
                 .Include(b => b.Flight)
-                .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId);
+                .FirstOrDefaultAsync(b => b.BookingId == bookingId && (b.UserId == userId || isAdmin));
 
             if (booking == null)
             {
@@ -490,53 +493,19 @@ namespace FlightBookingBackend.Services
                 return (false, "Booking not found.");
             }
 
-            if (booking.BookingStatus == BookingStatuses.Cancelled)
+            if (string.Equals(booking.BookingStatus, BookingStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
             {
                 await transaction.RollbackAsync();
                 return (false, "Booking is already cancelled.");
             }
 
-            if (booking.BookingStatus == BookingStatuses.Failed)
+            if (string.Equals(booking.BookingStatus, BookingStatuses.Failed, StringComparison.OrdinalIgnoreCase))
             {
-                // A failed booking never held a seat or earned points, so there is nothing to release.
                 await transaction.RollbackAsync();
                 return (false, "A failed booking cannot be cancelled.");
             }
 
-            var earnedPoints = await _context.CouponTransactions
-                .Where(couponTransaction => couponTransaction.BookingId == bookingId &&
-                                            couponTransaction.UserId == userId &&
-                                            couponTransaction.TransactionType == "Earned" &&
-                                            couponTransaction.Status == "Available")
-                .Select(couponTransaction => (decimal?)couponTransaction.Points)
-                .SingleOrDefaultAsync() ?? 0m;
-            if (earnedPoints > 0m)
-            {
-                var balanceTransactions = await _context.CouponTransactions
-                    .Where(couponTransaction => couponTransaction.UserId == userId &&
-                                                ((couponTransaction.TransactionType == "Earned" &&
-                                                  couponTransaction.Status == "Available") ||
-                                                 (couponTransaction.TransactionType == "Redeemed" &&
-                                                  couponTransaction.Status == "Redeemed")))
-                    .Select(couponTransaction => new
-                    {
-                        couponTransaction.TransactionType,
-                        couponTransaction.Points
-                    })
-                    .ToListAsync();
-                var totalAvailableEarned = balanceTransactions
-                    .Where(couponTransaction => couponTransaction.TransactionType == "Earned")
-                    .Sum(couponTransaction => couponTransaction.Points);
-                var totalRedeemed = balanceTransactions
-                    .Where(couponTransaction => couponTransaction.TransactionType == "Redeemed")
-                    .Sum(couponTransaction => couponTransaction.Points);
-                if (totalAvailableEarned - earnedPoints - totalRedeemed < 0m)
-                {
-                    await transaction.RollbackAsync();
-                    return (false, "This booking's coupon points have already been redeemed and cannot be reversed without creating a negative balance.");
-                }
-            }
-
+            // Update Booking Status to Cancelled in the database
             booking.BookingStatus = BookingStatuses.Cancelled;
             booking.PaymentStatus = "Refunded";
             booking.CancelDate = DateTime.UtcNow;
@@ -544,10 +513,12 @@ namespace FlightBookingBackend.Services
             // Restore available seats on flight based on passenger count
             if (booking.Flight != null)
             {
-                booking.Flight.AvailableSeats += booking.PassengerCount;
+                booking.Flight.AvailableSeats = Math.Min(
+                    booking.Flight.TotalSeats,
+                    booking.Flight.AvailableSeats + Math.Max(1, booking.PassengerCount));
             }
 
-            // Permanently delete all coupons newly generated for this cancelled ticket
+            // Permanently delete or cancel all coupons newly generated for this cancelled ticket
             var earnedCoupons = await _context.Coupons
                 .Include(c => c.CouponUsages)
                 .Where(c => c.GeneratedForBookingId == booking.BookingId)
@@ -580,31 +551,35 @@ namespace FlightBookingBackend.Services
                 _context.CouponUsages.Remove(appliedUsage);
             }
 
-            var earnedTransaction = await _context.CouponTransactions
-                .FirstOrDefaultAsync(couponTransaction =>
+            // Mark any points earned from this booking as Cancelled
+            var earnedTransactions = await _context.CouponTransactions
+                .Where(couponTransaction =>
                     couponTransaction.BookingId == bookingId &&
-                    couponTransaction.UserId == userId &&
+                    couponTransaction.UserId == booking.UserId &&
                     couponTransaction.TransactionType == "Earned" &&
-                    couponTransaction.Status == "Available");
-            if (earnedTransaction != null)
+                    couponTransaction.Status != "Cancelled")
+                .ToListAsync();
+            foreach (var t in earnedTransactions)
             {
-                earnedTransaction.Status = "Cancelled";
+                t.Status = "Cancelled";
             }
 
-            var redeemedTransaction = await _context.CouponTransactions
-                .FirstOrDefaultAsync(couponTransaction =>
+            // If user redeemed points directly for this booking, refund those points back
+            var redeemedTransactions = await _context.CouponTransactions
+                .Where(couponTransaction =>
                     couponTransaction.BookingId == bookingId &&
-                    couponTransaction.UserId == userId &&
+                    couponTransaction.UserId == booking.UserId &&
                     couponTransaction.TransactionType == "Redeemed" &&
-                    couponTransaction.Status == "Redeemed");
-            if (redeemedTransaction != null)
+                    couponTransaction.Status == "Redeemed")
+                .ToListAsync();
+            foreach (var t in redeemedTransactions)
             {
-                redeemedTransaction.Status = "Cancelled";
+                t.Status = "Cancelled";
             }
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
-            return (true, "Booking cancelled successfully.");
+            return (true, "Ticket cancelled successfully. Booking status updated to Cancelled.");
         }
 
         public async Task<(bool Success, string Message, BookingDetailDto? Booking)> RescheduleBookingAsync(

@@ -38,12 +38,12 @@ public class BookingCouponWorkflowTests
         Assert.Equal(1500m, booking.TicketPrice);
         Assert.Equal(0m, booking.DiscountAmount);
         Assert.Equal("Earned", pointsTransaction.TransactionType);
-        Assert.Equal("Available", pointsTransaction.Status);
+        Assert.Equal("Pending", pointsTransaction.Status);
         Assert.Equal(user.Id, pointsTransaction.UserId);
         Assert.Equal(booking.BookingId, pointsTransaction.BookingId);
         Assert.Equal(15m, pointsTransaction.Points);
         Assert.Equal(15m, result.Booking?.CouponPointsEarned);
-        Assert.Equal(15m, result.Booking?.AvailableCouponPoints);
+        Assert.Equal(0m, result.Booking?.AvailableCouponPoints);
 
         var coupon = await context.Coupons.SingleAsync();
         var couponDto = (await new CouponService(context).GetAllCouponsAsync(user.Id)).Single();
@@ -247,7 +247,7 @@ public class BookingCouponWorkflowTests
         Assert.Equal(1, await context.CouponTransactions.CountAsync(c => c.UserId == anotherUser.Id));
         Assert.Equal(3, await context.Coupons.CountAsync());
         Assert.Equal(
-            new[] { firstBooking.Booking!.BookingId, secondBooking.Booking!.BookingId, anotherPassengerBooking.Booking!.BookingId }.OrderBy(id => id),
+            new int?[] { firstBooking.Booking!.BookingId, secondBooking.Booking!.BookingId, anotherPassengerBooking.Booking!.BookingId }.OrderBy(id => id),
             await context.CouponTransactions
                 .OrderBy(c => c.BookingId)
                 .Select(c => c.BookingId)
@@ -262,7 +262,7 @@ public class BookingCouponWorkflowTests
         await context.Database.EnsureCreatedAsync();
 
         var user = CreateUser();
-        var sourceFlight = CreateFlight(1000m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2));
+        var sourceFlight = CreateFlight(1000m, DateOnly.FromDateTime(DateTime.UtcNow));
         var redemptionFlight = CreateFlight(200m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(4));
         context.AddRange(user, sourceFlight, redemptionFlight);
         await context.SaveChangesAsync();
@@ -292,14 +292,15 @@ public class BookingCouponWorkflowTests
         context.ChangeTracker.Clear();
         var couponService = new CouponService(context);
         var balanceAfterRedemption = await couponService.GetCouponBalanceAsync(user.Id);
-        Assert.Equal(20m, balanceAfterRedemption.AvailablePoints);
+        Assert.Equal(0m, balanceAfterRedemption.AvailablePoints);
+        Assert.Equal(20m, balanceAfterRedemption.PendingPoints);
         Assert.Equal(100m, balanceAfterRedemption.RedeemedPoints);
         Assert.Equal(120m, balanceAfterRedemption.TotalPoints);
         Assert.Equal(1, await context.CouponTransactions.CountAsync(t => t.TransactionType == "Redeemed"));
 
         var cancelEarnedBooking = await service.CancelBookingAsync(sourceBooking.Booking!.BookingId, user.Id);
-        Assert.False(cancelEarnedBooking.Success);
-        Assert.Equal("Confirmed", await context.Bookings
+        Assert.True(cancelEarnedBooking.Success);
+        Assert.Equal("Cancelled", await context.Bookings
             .Where(booking => booking.BookingId == sourceBooking.Booking.BookingId)
             .Select(booking => booking.BookingStatus)
             .SingleAsync());
@@ -313,7 +314,7 @@ public class BookingCouponWorkflowTests
         await context.Database.EnsureCreatedAsync();
 
         var user = CreateUser();
-        var sourceFlight = CreateFlight(20m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2));
+        var sourceFlight = CreateFlight(20m, DateOnly.FromDateTime(DateTime.UtcNow));
         var redemptionFlight = CreateFlight(20m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(4));
         context.AddRange(user, sourceFlight, redemptionFlight);
         await context.SaveChangesAsync();
@@ -339,6 +340,45 @@ public class BookingCouponWorkflowTests
         Assert.Equal(0m, zeroValueReward.CouponPoints);
         Assert.Equal(0m, zeroValueReward.DiscountAmount);
         Assert.Equal("Pending", zeroValueReward.Status);
+    }
+
+    [Fact]
+    public async Task PendingCouponsDoNotIncludePointsInAvailableBalanceUntilAvailable()
+    {
+        await using var connection = await OpenDatabaseAsync();
+        await using var context = CreateContext(connection);
+        await context.Database.EnsureCreatedAsync();
+
+        var user = CreateUser();
+        // Flight departs 5 days in the future
+        var futureFlight = CreateFlight(1000m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(5));
+        context.AddRange(user, futureFlight);
+        await context.SaveChangesAsync();
+
+        var service = new BookingService(context, new CouponService(context));
+        var bookingResult = await service.CreateBookingAsync(user.Id, CreateBookingRequest(futureFlight.FlightId));
+        Assert.True(bookingResult.Success, bookingResult.Message);
+
+        var coupon = await context.Coupons.SingleAsync(c => c.GeneratedForBookingId == bookingResult.Booking!.BookingId);
+        Assert.Equal("Pending", coupon.Status);
+        Assert.True(coupon.CouponPoints > 0m);
+
+        // Verify balance: AvailablePoints must ONLY include Available coupons, NOT Pending
+        var couponService = new CouponService(context);
+        var balance = await couponService.GetCouponBalanceAsync(user.Id);
+        Assert.Equal(0m, balance.AvailablePoints);
+        Assert.Equal(0m, balance.AvailableDiscountAmount);
+        Assert.Equal(coupon.CouponPoints, balance.PendingPoints);
+        Assert.Equal(coupon.CouponPoints, balance.TotalPoints);
+
+        // When the flight date arrives, status updates to Available and points become available
+        futureFlight.DepartureDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        await context.SaveChangesAsync();
+
+        var refreshedBalance = await couponService.GetCouponBalanceAsync(user.Id);
+        Assert.Equal(coupon.CouponPoints, refreshedBalance.AvailablePoints);
+        Assert.Equal(0m, refreshedBalance.PendingPoints);
+        Assert.Equal(Math.Floor(coupon.CouponPoints / 10m), refreshedBalance.AvailableDiscountAmount);
     }
 
     [Fact]

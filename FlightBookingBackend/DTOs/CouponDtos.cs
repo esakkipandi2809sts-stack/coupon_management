@@ -80,4 +80,17 @@ namespace FlightBookingBackend.DTOs
         public decimal AvailableDiscountAmount { get; set; }
     }
 
+    public class CreateCouponFromPointsDto
+    {
+        [Range(10, int.MaxValue, ErrorMessage = "Minimum 10 points are required to create a coupon.")]
+        public int Points { get; set; }
+    }
+
+    public class CreateCouponFromPointsResultDto
+    {
+        public string CouponCode { get; set; } = string.Empty;
+        public decimal DiscountAmount { get; set; }
+        public int PointsRedeemed { get; set; }
+        public DateTime ExpiryDate { get; set; }
+    }
 }

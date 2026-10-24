@@ -473,7 +473,7 @@ BEGIN
     CREATE TABLE dbo.CouponTransactions (
         CouponTransactionId INT IDENTITY(1,1) NOT NULL,
         UserId INT NOT NULL,
-        BookingId INT NOT NULL,
+        BookingId INT NULL,
         TransactionType NVARCHAR(20) NOT NULL,
         Points DECIMAL(18,4) NOT NULL,
         DiscountAmount DECIMAL(18,2) NOT NULL CONSTRAINT DF_CouponTransactions_DiscountAmount DEFAULT 0,
@@ -481,7 +481,6 @@ BEGIN
         TransactionDate DATETIME2 NOT NULL CONSTRAINT DF_CouponTransactions_TransactionDate DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_CouponTransactions PRIMARY KEY CLUSTERED (CouponTransactionId ASC),
         CONSTRAINT FK_CouponTransactions_Users FOREIGN KEY (UserId) REFERENCES dbo.Users (Id) ON DELETE NO ACTION,
-        CONSTRAINT FK_CouponTransactions_Bookings FOREIGN KEY (BookingId) REFERENCES dbo.Bookings (BookingId) ON DELETE NO ACTION,
         CONSTRAINT CK_CouponTransactions_Points CHECK (Points > 0),
         CONSTRAINT CK_CouponTransactions_DiscountAmount CHECK (DiscountAmount >= 0),
         CONSTRAINT CK_CouponTransactions_Type CHECK (TransactionType IN (N'Earned', N'Redeemed')),
@@ -491,7 +490,8 @@ END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_CouponTransactions_Booking_Type' AND object_id = OBJECT_ID(N'dbo.CouponTransactions'))
     CREATE UNIQUE NONCLUSTERED INDEX UX_CouponTransactions_Booking_Type
-        ON dbo.CouponTransactions (BookingId, TransactionType);
+        ON dbo.CouponTransactions (BookingId, TransactionType)
+        WHERE BookingId IS NOT NULL;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_CouponTransactions_User_Status_Type' AND object_id = OBJECT_ID(N'dbo.CouponTransactions'))
     CREATE NONCLUSTERED INDEX IX_CouponTransactions_User_Status_Type
         ON dbo.CouponTransactions (UserId, Status, TransactionType);
@@ -568,6 +568,54 @@ IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', 
             context.Database.ExecuteSqlRaw(@"
 IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', N'CancelDate') IS NOT NULL
     EXEC(N'UPDATE dbo.Bookings SET CancelDate = BookingDate WHERE BookingStatus = ''Cancelled'' AND CancelDate IS NULL;');
+");
+
+            // Make CouponTransactions.BookingId nullable so points-redemption rows (no booking) can be inserted.
+            context.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.CouponTransactions', N'U') IS NOT NULL
+   AND COLUMNPROPERTY(OBJECT_ID(N'dbo.CouponTransactions'), N'BookingId', 'AllowsNull') = 0
+BEGIN
+    -- Drop old filtered/unfiltered unique index so we can recreate it with WHERE BookingId IS NOT NULL
+    IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_CouponTransactions_Booking_Type' AND object_id = OBJECT_ID(N'dbo.CouponTransactions'))
+        DROP INDEX UX_CouponTransactions_Booking_Type ON dbo.CouponTransactions;
+
+    -- Drop the NOT NULL FK constraint before altering the column
+    IF EXISTS (
+        SELECT 1 FROM sys.foreign_keys
+        WHERE name = N'FK_CouponTransactions_Bookings'
+          AND parent_object_id = OBJECT_ID(N'dbo.CouponTransactions'))
+        ALTER TABLE dbo.CouponTransactions DROP CONSTRAINT FK_CouponTransactions_Bookings;
+
+    -- Allow NULL in BookingId (points-redemption transactions have no booking)
+    ALTER TABLE dbo.CouponTransactions ALTER COLUMN BookingId INT NULL;
+
+    -- Recreate the unique index filtered to rows where BookingId is not null
+    CREATE UNIQUE NONCLUSTERED INDEX UX_CouponTransactions_Booking_Type
+        ON dbo.CouponTransactions (BookingId, TransactionType)
+        WHERE BookingId IS NOT NULL;
+END;
+");
+
+            // Synchronize existing CouponTransactions.Status with Coupon.Status so Pending coupons have Pending transactions
+            context.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.CouponTransactions', N'U') IS NOT NULL AND OBJECT_ID(N'dbo.Coupons', N'U') IS NOT NULL
+BEGIN
+    UPDATE t
+    SET t.Status = N'Pending'
+    FROM dbo.CouponTransactions t
+    INNER JOIN dbo.Coupons c ON t.BookingId = c.GeneratedForBookingId
+    WHERE t.TransactionType = N'Earned'
+      AND c.Status = N'Pending'
+      AND t.Status <> N'Pending';
+
+    UPDATE t
+    SET t.Status = N'Available'
+    FROM dbo.CouponTransactions t
+    INNER JOIN dbo.Coupons c ON t.BookingId = c.GeneratedForBookingId
+    WHERE t.TransactionType = N'Earned'
+      AND c.Status = N'Available'
+      AND t.Status <> N'Available';
+END;
 ");
         }
     }

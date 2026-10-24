@@ -11,6 +11,7 @@ namespace FlightBookingBackend.Services
         Task<CouponEligibilityDto> GetCouponEligibilityAsync(int userId);
         Task<CouponBalanceDto> GetCouponBalanceAsync(int userId);
         Task<CouponValidationResultDto> ValidateCouponAsync(string couponCode, int flightId, string flightClass, int userId, int passengerCount = 1);
+        Task<(bool Success, string Message, CreateCouponFromPointsResultDto? Result)> CreateCouponFromPointsAsync(int userId, int points);
         Task RefreshStatusesAsync();
         DateOnly GetBusinessDate();
     }

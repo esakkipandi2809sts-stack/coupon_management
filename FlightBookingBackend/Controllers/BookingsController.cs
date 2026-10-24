@@ -107,7 +107,8 @@ namespace FlightBookingBackend.Controllers
             try
             {
                 var userId = GetCurrentUserId();
-                var (success, message) = await _bookingService.CancelBookingAsync(id, userId);
+                var isAdmin = User.IsInRole("Admin");
+                var (success, message) = await _bookingService.CancelBookingAsync(id, userId, isAdmin);
 
                 if (!success)
                 {

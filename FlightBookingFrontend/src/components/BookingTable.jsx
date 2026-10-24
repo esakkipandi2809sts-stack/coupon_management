@@ -10,7 +10,10 @@ const STATUS_BADGES = {
 };
 
 // Confirmed and Rescheduled bookings are active tickets; Cancelled and Failed ones are final.
-const isActiveBooking = (b) => b.bookingStatus === 'Confirmed' || b.bookingStatus === 'Rescheduled';
+const isActiveBooking = (b) => {
+  const status = String(b?.bookingStatus || '').toLowerCase();
+  return status === 'confirmed' || status === 'rescheduled';
+};
 
 const formatCancelDate = (dateVal) => {
   if (!dateVal) return '';
@@ -136,12 +139,7 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span className={`badge ${STATUS_BADGES[b.bookingStatus] || 'badge-pending'}`}>
                         {b.bookingStatus}
-                      </span>
-                      {b.bookingStatus?.toLowerCase() === 'cancelled' && (b.cancelDate ?? b.cancelledDate ?? b.cancellationDate) && (
-                        <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>
-                          Cancelled: {formatCancelDate(b.cancelDate ?? b.cancelledDate ?? b.cancellationDate)}
-                        </span>
-                      )}
+                      </span>                      
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
 
@@ -172,7 +170,7 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                       {isActiveBooking(b) && (
                         <button
                           onClick={() => onCancel(b.bookingId)}
-                          title="Cancel Booking"
+                          title="Cancel Ticket"
                           style={{
                             padding: '6px 10px',
                             borderRadius: '8px',
@@ -183,7 +181,8 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                             alignItems: 'center',
                             gap: '4px',
                             fontSize: '0.78rem',
-                            fontWeight: 600
+                            fontWeight: 600,
+                            cursor: 'pointer'
                           }}
                         >
                           <XCircle size={14} />

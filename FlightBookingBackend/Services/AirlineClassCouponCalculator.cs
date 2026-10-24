@@ -7,17 +7,17 @@ namespace FlightBookingBackend.Services
             new(AirlineClassComparer.Instance)
             {
                 { ("IndiGo", "Business"), 2m },
-                { ("Spice Jet", "Business"), 1m },
+                { ("SpiceJet", "Business"), 1m },
                 { ("IndiGo", "Economy"), 2m },
-                { ("Spice Jet", "First"), 1m },
+                { ("SpiceJet", "First"), 1m },
                 { ("British Airways", "Business"), 2m },
                 { ("British Airways", "Economy"), 1m },
 
                 // Additional supported airline and class combinations
                 { ("IndiGo", "Premium Economy"), 2m },
                 { ("IndiGo", "First"), 2m },
-                { ("Spice Jet", "Economy"), 1m },
-                { ("Spice Jet", "Premium Economy"), 1m },
+                { ("SpiceJet", "Economy"), 1m },
+                { ("SpiceJet", "Premium Economy"), 1m },
                 { ("British Airways", "First"), 2m },
                 { ("British Airways", "Premium Economy"), 1m },
                 { ("Air India", "Business"), 2m },
@@ -83,9 +83,9 @@ namespace FlightBookingBackend.Services
             if (trimmed.Equals("IndiGo", StringComparison.OrdinalIgnoreCase) ||
                 trimmed.Equals("Indigo", StringComparison.OrdinalIgnoreCase))
                 return "IndiGo";
-            if (trimmed.Equals("Spice Jet", StringComparison.OrdinalIgnoreCase) ||
+            if (trimmed.Equals("SpiceJet", StringComparison.OrdinalIgnoreCase) ||
                 trimmed.Equals("Spice Jet", StringComparison.OrdinalIgnoreCase))
-                return "Spice Jet";
+                return "SpiceJet";
             if (trimmed.Equals("British Airways", StringComparison.OrdinalIgnoreCase) ||
                 trimmed.Equals("BritishAirways", StringComparison.OrdinalIgnoreCase))
                 return "British Airways";

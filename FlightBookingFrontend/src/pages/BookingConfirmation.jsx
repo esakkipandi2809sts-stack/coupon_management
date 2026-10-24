@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatINR } from '../utils/flightPricing';
+import { bookingApi } from '../services/api';
 
 const formatCancelDate = (dateVal) => {
   if (!dateVal) return '';
@@ -27,22 +28,59 @@ export default function BookingConfirmation() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const booking = location.state?.booking;
+  const initialBooking = location.state?.booking;
   const couponPageData = location.state?.couponPageData;
   const couponRefreshError = location.state?.couponRefreshError;
 
+  const [currentBooking, setCurrentBooking] = useState(initialBooking);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelMessage, setCancelMessage] = useState('');
+  const [cancelError, setCancelError] = useState('');
+
+  const booking = currentBooking;
+
   useEffect(() => {
-    // Launch celebratory confetti effect on mount
-    try {
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-    } catch {
-      // Ignore if canvas-confetti is not loaded
+    // Launch celebratory confetti effect on mount if booking is confirmed
+    if (booking?.bookingStatus?.toLowerCase() !== 'cancelled') {
+      try {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      } catch {
+        // Ignore if canvas-confetti is not loaded
+      }
     }
   }, []);
+
+  const handleCancelTicket = async () => {
+    if (!booking?.bookingId) return;
+
+    const confirmed = window.confirm(
+      'Are you sure you want to cancel this flight ticket? This will update the booking status to Cancelled in the database.'
+    );
+    if (!confirmed) return;
+
+    setCancelling(true);
+    setCancelError('');
+    setCancelMessage('');
+
+    try {
+      const res = await bookingApi.cancel(booking.bookingId);
+      setCancelMessage(res.data?.message || 'Ticket cancelled successfully.');
+      setCurrentBooking(prev => ({
+        ...prev,
+        bookingStatus: 'Cancelled',
+        paymentStatus: 'Refunded',
+        cancelDate: new Date().toISOString()
+      }));
+    } catch (err) {
+      setCancelError(err.response?.data?.message || 'Failed to cancel ticket.');
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   if (!booking) {
     return (
@@ -363,8 +401,44 @@ export default function BookingConfirmation() {
         </div>
       </div>
 
+      {cancelMessage && (
+        <div style={{ width: '100%', maxWidth: '780px', padding: '14px 18px', borderRadius: '12px', backgroundColor: '#ecfdf5', border: '1px solid #86efac', color: '#065f46', fontSize: '0.9rem', textAlign: 'center' }}>
+          {cancelMessage}
+        </div>
+      )}
+
+      {cancelError && (
+        <div role="alert" style={{ width: '100%', maxWidth: '780px', padding: '14px 18px', borderRadius: '12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: '0.9rem', textAlign: 'center' }}>
+          {cancelError}
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }} className="no-print">
+        {booking.bookingStatus?.toLowerCase() !== 'cancelled' && (
+          <button
+            onClick={handleCancelTicket}
+            disabled={cancelling}
+            style={{
+              padding: '12px 24px',
+              borderRadius: '12px',
+              backgroundColor: '#fef2f2',
+              color: '#dc2626',
+              border: '1px solid #fecaca',
+              fontWeight: 700,
+              fontSize: '0.95rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: cancelling ? 'not-allowed' : 'pointer',
+              boxShadow: '0 4px 14px rgba(220, 38, 38, 0.15)'
+            }}
+          >
+            <XCircle size={18} />
+            <span>{cancelling ? 'Cancelling Ticket...' : 'Cancel Ticket'}</span>
+          </button>
+        )}
+
         <button
           onClick={handlePrint}
           style={{

@@ -143,6 +143,9 @@ export const couponApi = {
   getStatistics: () => api.get('/coupons/summary'),
 
   getAdminStatistics: () => api.get('/coupons/admin/summary'),
+
+  createFromPoints: (points) =>
+    api.post('/coupons/create-from-points', { points }),
 };
 
 // Dashboard APIs

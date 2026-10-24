@@ -143,8 +143,10 @@ namespace FlightBookingBackend.Data
             modelBuilder.Entity<CouponTransaction>(entity =>
             {
                 entity.HasKey(e => e.CouponTransactionId);
+                // Only enforce uniqueness when BookingId is not null (points-redemption rows have no booking)
                 entity.HasIndex(e => new { e.BookingId, e.TransactionType })
                     .IsUnique()
+                    .HasFilter("[BookingId] IS NOT NULL")
                     .HasDatabaseName("UX_CouponTransactions_Booking_Type");
                 entity.HasIndex(e => new { e.UserId, e.Status, e.TransactionType })
                     .HasDatabaseName("IX_CouponTransactions_User_Status_Type");
@@ -155,6 +157,7 @@ namespace FlightBookingBackend.Data
                 entity.HasOne(e => e.Booking)
                     .WithMany(booking => booking.CouponTransactions)
                     .HasForeignKey(e => e.BookingId)
+                    .IsRequired(false)
                     .OnDelete(DeleteBehavior.Restrict);
                 entity.ToTable(table =>
                 {

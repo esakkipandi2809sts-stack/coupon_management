@@ -97,7 +97,7 @@ export default function MyBookings() {
 
   const handleCancel = async (bookingId) => {
     const confirmed = window.confirm(
-      'Are you sure you want to cancel this flight booking? This will release your seat.'
+      'Are you sure you want to cancel this flight ticket?'
     );
 
     if (!confirmed) return;
@@ -108,13 +108,13 @@ export default function MyBookings() {
     try {
       const res = await bookingApi.cancel(bookingId);
 
-      setMessage(res.data?.message || 'Booking cancelled successfully.');
+      setMessage(res.data?.message || 'Ticket cancelled successfully. Booking status updated to Cancelled.');
       window.setTimeout(() => setMessage(''), 4000);
 
       await fetchBookings();
     } catch (err) {
       const msg =
-        err.response?.data?.message || 'Failed to cancel booking.';
+        err.response?.data?.message || 'Failed to cancel ticket.';
 
       setErrorMessage(msg);
       window.setTimeout(() => setErrorMessage(''), 4000);

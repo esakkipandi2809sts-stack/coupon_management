@@ -124,6 +124,36 @@ namespace FlightBookingBackend.Services
 
         public async Task<CouponBalanceDto> GetCouponBalanceAsync(int userId)
         {
+            await RefreshStatusesAsync();
+
+            // Synchronize earned transactions with their coupon's current status
+            var earnedWithCoupons = await (
+                from t in _context.CouponTransactions
+                join c in _context.Coupons on t.BookingId equals c.GeneratedForBookingId
+                where t.UserId == userId && t.TransactionType == "Earned" && t.Status != "Cancelled"
+                select new { Transaction = t, CouponStatus = c.Status }
+            ).ToListAsync();
+
+            bool hasChanges = false;
+            foreach (var item in earnedWithCoupons)
+            {
+                if (item.CouponStatus == "Pending" && item.Transaction.Status != "Pending")
+                {
+                    item.Transaction.Status = "Pending";
+                    hasChanges = true;
+                }
+                else if (item.CouponStatus == "Available" && item.Transaction.Status != "Available")
+                {
+                    item.Transaction.Status = "Available";
+                    hasChanges = true;
+                }
+            }
+
+            if (hasChanges)
+            {
+                await _context.SaveChangesAsync();
+            }
+
             var transactions = await _context.CouponTransactions
                 .AsNoTracking()
                 .Where(transaction => transaction.UserId == userId)
@@ -134,6 +164,7 @@ namespace FlightBookingBackend.Services
                     transaction.Status
                 })
                 .ToListAsync();
+
             var earned = transactions
                 .Where(transaction => transaction.TransactionType == "Earned" && transaction.Status == "Available")
                 .Sum(transaction => transaction.Points);
@@ -333,6 +364,86 @@ namespace FlightBookingBackend.Services
             };
         }
 
+        public async Task<(bool Success, string Message, CreateCouponFromPointsResultDto? Result)> CreateCouponFromPointsAsync(int userId, int points)
+        {
+            if (points < 10)
+                return (false, "Minimum 10 points are required to create a coupon (10 points = ₹1).", null);
+
+            // Read current available balance (only earned points from Available coupons minus redeemed)
+            var balanceDto = await GetCouponBalanceAsync(userId);
+            var available = balanceDto.AvailablePoints;
+
+            if (available < 10)
+                return (false, $"Insufficient coupon points. You currently have {Math.Floor(available)} available points in your account. Minimum 10 points are required to create a coupon.", null);
+
+            if (points > available)
+                return (false, $"Insufficient coupon points. You have {Math.Floor(available)} available points, but {points} points are required to create this coupon.", null);
+
+            // 10 points = ₹1
+            var discountAmount = (decimal)Math.Floor(points / 10.0);
+            if (discountAmount <= 0)
+                return (false, "Points are too low to generate a discount.", null);
+
+            var now = DateTime.UtcNow;
+
+            // Generate a unique coupon code
+            const int maxAttempts = 20;
+            string couponCode = string.Empty;
+            for (var attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                var candidate = CouponCodeGenerator.Generate();
+                var exists = await _context.Coupons.AnyAsync(c =>
+                    c.CouponCode == candidate || c.LegacyCouponCode == candidate);
+                if (!exists) { couponCode = candidate; break; }
+            }
+            if (string.IsNullOrEmpty(couponCode))
+                return (false, "Could not generate a unique coupon code. Please try again.", null);
+
+            // Deduct points
+            _context.CouponTransactions.Add(new CouponTransaction
+            {
+                UserId = userId,
+                BookingId = null,
+                TransactionType = "Redeemed",
+                Points = points,
+                DiscountAmount = discountAmount,
+                Status = "Redeemed",
+                TransactionDate = now
+            });
+
+            // Create the coupon
+            var coupon = new Coupon
+            {
+                CouponCode = couponCode,
+                Description = $"Points Redemption Coupon: {points} pts — ₹{discountAmount} OFF",
+                DiscountType = "Fixed",
+                DiscountValue = discountAmount,
+                DiscountAmount = discountAmount,
+                DiscountPercentage = 0m,
+                CouponPoints = points,
+                OriginalFlightFare = 0m,
+                MinimumAmount = 0m,
+                MaximumDiscount = discountAmount,
+                ExpiryDate = now.AddYears(1),
+                TotalUsageLimit = 1,
+                UsedCount = 0,
+                Status = "Available",
+                CreatedAt = now,
+                UserId = userId,
+                GeneratedForBookingId = null
+            };
+            _context.Coupons.Add(coupon);
+            await _context.SaveChangesAsync();
+
+            return (true, "Coupon created successfully.", new CreateCouponFromPointsResultDto
+            {
+                CouponCode = couponCode,
+                DiscountAmount = discountAmount,
+                PointsRedeemed = points,
+                ExpiryDate = coupon.ExpiryDate
+            });
+        }
+
         public async Task RefreshStatusesAsync()
         {
             var today = GetBusinessDate();
@@ -404,6 +515,16 @@ namespace FlightBookingBackend.Services
                             c.GeneratedForBooking.Flight.DepartureDate <= today &&
                             c.ExpiryDate > now)
                 .ExecuteUpdateAsync(updates => updates.SetProperty(c => c.Status, "Available"));
+
+            // 7. Update pending coupon transactions to available
+            await _context.CouponTransactions
+                .Where(t => t.TransactionType == "Earned" &&
+                            t.Status == "Pending" &&
+                            t.Booking != null &&
+                            t.Booking.Flight != null &&
+                            t.Booking.BookingStatus != BookingStatuses.Cancelled &&
+                            t.Booking.Flight.DepartureDate <= today)
+                .ExecuteUpdateAsync(updates => updates.SetProperty(t => t.Status, "Available"));
         }
 
         private Task<int> GetSuccessfulBookingCountAsync(int userId)
