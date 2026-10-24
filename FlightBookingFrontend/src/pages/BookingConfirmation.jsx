@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
+  XCircle,
   Download,
   Printer,
   LayoutDashboard,
@@ -10,6 +11,17 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatINR } from '../utils/flightPricing';
+
+const formatCancelDate = (dateVal) => {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+};
 
 export default function BookingConfirmation() {
   const location = useLocation();
@@ -65,23 +77,24 @@ export default function BookingConfirmation() {
             width: '64px',
             height: '64px',
             borderRadius: '50%',
-            backgroundColor: '#ecfdf5',
-            color: '#059669',
+            backgroundColor: booking.bookingStatus?.toLowerCase() === 'cancelled' ? '#fef2f2' : '#ecfdf5',
+            color: booking.bookingStatus?.toLowerCase() === 'cancelled' ? '#dc2626' : '#059669',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 16px',
-            boxShadow: '0 8px 20px rgba(16, 185, 129, 0.2)'
+            boxShadow: booking.bookingStatus?.toLowerCase() === 'cancelled' ? '0 8px 20px rgba(220, 38, 38, 0.2)' : '0 8px 20px rgba(16, 185, 129, 0.2)'
           }}
         >
-          <CheckCircle2 size={36} />
+          {booking.bookingStatus?.toLowerCase() === 'cancelled' ? <XCircle size={36} /> : <CheckCircle2 size={36} />}
         </div>
-        <h1 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
-          Booking Confirmed!
+        <h1 style={{ fontSize: '1.85rem', fontWeight: 800, color: booking.bookingStatus?.toLowerCase() === 'cancelled' ? '#dc2626' : '#0f172a', letterSpacing: '-0.02em' }}>
+          {booking.bookingStatus?.toLowerCase() === 'cancelled' ? 'Booking Cancelled' : 'Booking Confirmed!'}
         </h1>
         <p style={{ color: '#64748b', fontSize: '0.95rem', marginTop: '6px' }}>
-          {booking.message || 'Your flight ticket has been issued successfully.'} A confirmation email has been sent to{' '}
-          <strong style={{ color: '#0f172a' }}>{booking.passengerEmail}</strong>.
+          {booking.bookingStatus?.toLowerCase() === 'cancelled'
+            ? `This booking was cancelled${(booking.cancelDate || booking.cancelledDate) ? ` on ${formatCancelDate(booking.cancelDate ?? booking.cancelledDate)}` : ''}. Any eligible refund has been processed.`
+            : (booking.message || 'Your flight ticket has been issued successfully.') + ` A confirmation email has been sent to ${booking.passengerEmail}.`}
         </p>
       </div>
 
@@ -253,9 +266,14 @@ export default function BookingConfirmation() {
             <div>
               <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 600 }}>Status</div>
               <div style={{ marginTop: '4px' }}>
-                <span className="badge badge-confirmed">{booking.bookingStatus}</span>
+                <span className={`badge ${booking.bookingStatus?.toLowerCase() === 'cancelled' ? 'badge-cancelled' : 'badge-confirmed'}`}>{booking.bookingStatus}</span>
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#059669', marginTop: '3px' }}>Payment: {booking.paymentStatus}</div>
+              {booking.bookingStatus?.toLowerCase() === 'cancelled' && (booking.cancelDate || booking.cancelledDate || booking.cancellationDate) && (
+                <div style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 600, marginTop: '3px' }}>
+                  Cancelled: {formatCancelDate(booking.cancelDate ?? booking.cancelledDate ?? booking.cancellationDate)}
+                </div>
+              )}
+              <div style={{ fontSize: '0.75rem', color: booking.bookingStatus?.toLowerCase() === 'cancelled' ? '#dc2626' : '#059669', marginTop: '3px' }}>Payment: {booking.paymentStatus}</div>
             </div>
           </div>
 

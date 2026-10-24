@@ -108,8 +108,6 @@ public class FlightServiceTests
             Airline = "Test Airways",
             FromCity = "Chennai",
             ToCity = "Bangalore",
-            FromAirportCode = "maa",
-            ToAirportCode = "blr",
             StopCount = 0,
             DepartureDate = new DateOnly(2026, 10, 12),
             DepartureTime = "10:00",
@@ -128,10 +126,7 @@ public class FlightServiceTests
         Assert.True(created.FlightId > 0);
         Assert.Equal(1, await context.Flights.CountAsync());
         Assert.Equal(1500m, await context.Flights.Select(f => f.Price).SingleAsync());
-        Assert.Equal("MAA", created.FromAirportCode);
-        Assert.Equal("BLR", created.ToAirportCode);
         Assert.Equal(0, created.StopCount);
-        Assert.Equal("MAA", (await context.Flights.SingleAsync()).FromAirportCode);
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateFlightAsync(request));
         Assert.Equal(1, await context.Flights.CountAsync());
     }
@@ -173,8 +168,6 @@ public class FlightServiceTests
                 Airline = "Air India",
                 FromCity = "Chennai",
                 ToCity = "Bengaluru",
-                FromAirportCode = "MAA",
-                ToAirportCode = "BLR",
                 StopCount = 1,
                 DepartureDate = travelDate,
                 DepartureTime = "16:00",
@@ -193,8 +186,6 @@ public class FlightServiceTests
                 Airline = "Air India",
                 FromCity = "Chennai",
                 ToCity = "Bengaluru",
-                FromAirportCode = "MAA",
-                ToAirportCode = "BLR",
                 StopCount = 0,
                 DepartureDate = travelDate,
                 DepartureTime = "17:00",
@@ -213,8 +204,6 @@ public class FlightServiceTests
                 Airline = "Air India",
                 FromCity = "Chennai",
                 ToCity = "Bengaluru",
-                FromAirportCode = "MAA",
-                ToAirportCode = "BLR",
                 StopCount = 0,
                 DepartureDate = travelDate,
                 DepartureTime = "18:00",
@@ -234,8 +223,8 @@ public class FlightServiceTests
             new FixedTimeProvider(new DateTimeOffset(2026, 10, 12, 6, 0, 0, TimeSpan.Zero)));
         var results = await service.SearchFlightsAsync(new FlightSearchQueryDto
         {
-            FromCity = "MAA",
-            ToCity = "BLR",
+            FromCity = "Chennai",
+            ToCity = "Bengaluru",
             DepartureDate = travelDate,
             Passengers = 3,
             Adults = 1,
@@ -250,8 +239,8 @@ public class FlightServiceTests
         Assert.Equal(3000m, result.Price);
 
         var searchOptions = await service.GetSearchOptionsAsync();
-        Assert.Contains("MAA", searchOptions.Locations);
-        Assert.Contains("BLR", searchOptions.Locations);
+        Assert.Contains("Chennai", searchOptions.Locations);
+        Assert.Contains("Bengaluru", searchOptions.Locations);
         Assert.Contains("Air India", searchOptions.Airlines);
     }
 

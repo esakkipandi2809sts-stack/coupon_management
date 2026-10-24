@@ -12,6 +12,17 @@ const STATUS_BADGES = {
 // Confirmed and Rescheduled bookings are active tickets; Cancelled and Failed ones are final.
 const isActiveBooking = (b) => b.bookingStatus === 'Confirmed' || b.bookingStatus === 'Rescheduled';
 
+const formatCancelDate = (dateVal) => {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+};
+
 export default function BookingTable({ bookings, onView, onCancel, onDownload, onReschedule }) {
   if (!bookings || bookings.length === 0) {
     return (
@@ -127,11 +138,19 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                 </td>
 
                 {/* Status */}
-                <td style={{ padding: '16px 18px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <span className={`badge ${STATUS_BADGES[b.bookingStatus] || 'badge-pending'}`}>
-                    {b.bookingStatus}
-                  </span>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <td style={{ padding: '16px 18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span className={`badge ${STATUS_BADGES[b.bookingStatus] || 'badge-pending'}`}>
+                        {b.bookingStatus}
+                      </span>
+                      {b.bookingStatus?.toLowerCase() === 'cancelled' && (b.cancelDate ?? b.cancelledDate ?? b.cancellationDate) && (
+                        <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>
+                          Cancelled: {formatCancelDate(b.cancelDate ?? b.cancelledDate ?? b.cancellationDate)}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
 
 
                     {isActiveBooking(b) && onReschedule && (
@@ -178,6 +197,7 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                         <span>Cancel</span>
                       </button>
                     )}
+                    </div>
                   </div>
                 </td>
 

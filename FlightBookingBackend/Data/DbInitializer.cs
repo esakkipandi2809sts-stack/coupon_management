@@ -515,6 +515,59 @@ BEGIN
                       WHERE pointTransaction.BookingId = booking.BookingId
                         AND pointTransaction.TransactionType = N'Redeemed'));
 END;
+
+IF OBJECT_ID(N'dbo.CouponUsage', N'U') IS NOT NULL AND OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL
+BEGIN
+    UPDATE c
+    SET c.UsedCount = CASE WHEN c.UsedCount > 0 THEN c.UsedCount - 1 ELSE 0 END,
+        c.Status = N'Available'
+    FROM dbo.Coupons c
+    INNER JOIN dbo.CouponUsage cu ON c.CouponId = cu.CouponId
+    INNER JOIN dbo.Bookings b ON cu.BookingId = b.BookingId
+    WHERE b.BookingStatus = N'Cancelled';
+
+    DELETE cu
+    FROM dbo.CouponUsage cu
+    INNER JOIN dbo.Bookings b ON cu.BookingId = b.BookingId
+    WHERE b.BookingStatus = N'Cancelled';
+END;
+
+IF OBJECT_ID(N'dbo.Coupons', N'U') IS NOT NULL AND OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL
+BEGIN
+    DELETE cu
+    FROM dbo.CouponUsage cu
+    INNER JOIN dbo.Coupons c ON cu.CouponId = c.CouponId
+    INNER JOIN dbo.Bookings b ON c.GeneratedForBookingId = b.BookingId
+    WHERE b.BookingStatus = N'Cancelled';
+
+    DELETE c
+    FROM dbo.Coupons c
+    INNER JOIN dbo.Bookings b ON c.GeneratedForBookingId = b.BookingId
+    WHERE b.BookingStatus = N'Cancelled';
+END;
+
+IF OBJECT_ID(N'dbo.Coupons', N'U') IS NOT NULL
+BEGIN
+    UPDATE dbo.Coupons
+    SET Status = N'Available', UsedCount = 0
+    WHERE Status = N'Used'
+      AND ExpiryDate > GETUTCDATE()
+      AND NOT EXISTS (
+          SELECT 1 FROM dbo.CouponUsage cu
+          INNER JOIN dbo.Bookings b ON cu.BookingId = b.BookingId
+          WHERE cu.CouponId = dbo.Coupons.CouponId AND b.BookingStatus <> N'Cancelled'
+      );
+END;
+");
+
+            context.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', N'CancelDate') IS NULL
+    ALTER TABLE dbo.Bookings ADD CancelDate DATETIME2 NULL;
+");
+
+            context.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', N'CancelDate') IS NOT NULL
+    EXEC(N'UPDATE dbo.Bookings SET CancelDate = BookingDate WHERE BookingStatus = ''Cancelled'' AND CancelDate IS NULL;');
 ");
         }
     }

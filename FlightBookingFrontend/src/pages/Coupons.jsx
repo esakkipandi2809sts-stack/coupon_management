@@ -85,6 +85,7 @@ export default function Coupons() {
 
   // Filter coupons by tab and search
   const filteredCoupons = coupons.filter((c) => {
+    if (c.bookingStatus === 'Cancelled') return false;
     if (activeTab === 'available' && c.status.toLowerCase() !== 'available') return false;
     if (activeTab === 'pending' && c.status.toLowerCase() !== 'pending') return false;
     if (activeTab === 'used' && c.status.toLowerCase() !== 'used') return false;
@@ -321,7 +322,7 @@ export default function Coupons() {
 
           {/* Control bar: Search, Filter Tabs, and View Toggle */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-            
+
             {/* Tab filters & View switcher */}
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', backgroundColor: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
@@ -387,7 +388,7 @@ export default function Coupons() {
             </div>
           ) : viewMode === 'grid' ? (
             /* Grid Cards View */
-            <div style={{ display: 'grid',  gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' ,color:'red'}}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', color: 'red' }}>
               {filteredCoupons.map((c) => (
                 <CouponCard
                   key={c.couponId}
@@ -400,7 +401,7 @@ export default function Coupons() {
             /* Table View */
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', whiteSpace: 'nowrap', }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                       <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Coupon Code</th>
@@ -413,7 +414,7 @@ export default function Coupons() {
                       <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Expiry Date</th>
                       <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Usage</th>
                       <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Status</th>
-                      <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569', textAlign: 'right' }}>Action</th>
+                      {/* <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569', textAlign: 'right' }}>Action</th> */}
                     </tr>
                   </thead>
                   <tbody>

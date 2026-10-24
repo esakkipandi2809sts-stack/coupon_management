@@ -846,6 +846,107 @@ public class BookingCouponWorkflowTests
         Assert.Equal(coupon.DiscountAmount, b2.Booking?.DiscountAmount);
     }
 
+    [Fact]
+    public async Task CancelledTicketPermanentlyDeletesGeneratedCouponAndIsNotShownAsExpired()
+    {
+        await using var connection = await OpenDatabaseAsync();
+        await using var context = CreateContext(connection);
+        await context.Database.EnsureCreatedAsync();
+
+        var user = CreateUser();
+        var flight = CreateFlight(100m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(4));
+        flight.Airline = "IndiGo";
+        context.AddRange(user, flight);
+        await context.SaveChangesAsync();
+
+        var couponService = new CouponService(context);
+        var bookingService = new BookingService(context, couponService);
+
+        var bookingResult = await bookingService.CreateBookingAsync(user.Id, CreateBookingRequest(flight.FlightId));
+        Assert.True(bookingResult.Success);
+        var bookingId = bookingResult.Booking!.BookingId;
+
+        // Verify coupon was generated in database
+        Assert.True(await context.Coupons.AnyAsync(c => c.GeneratedForBookingId == bookingId));
+
+        // Cancel the booking
+        var cancelResult = await bookingService.CancelBookingAsync(bookingId, user.Id);
+        Assert.True(cancelResult.Success);
+
+        // 1. Newly generated coupon must be permanently deleted from the database
+        Assert.False(await context.Coupons.AnyAsync(c => c.GeneratedForBookingId == bookingId));
+
+        // 2. Coupon must not be shown as Expired or in GetAllCoupons
+        var allCoupons = await couponService.GetAllCouponsAsync(user.Id);
+        Assert.Empty(allCoupons);
+
+        var stats = await couponService.GetCouponStatisticsAsync(user.Id);
+        Assert.Equal(0, stats.TotalCoupons);
+        Assert.Equal(0, stats.ExpiredCoupons);
+    }
+
+    [Fact]
+    public async Task CouponsUsedForCancelledTicketMustNotRemainInUsedStatusAndMustChangeBackToAvailable()
+    {
+        await using var connection = await OpenDatabaseAsync();
+        await using var context = CreateContext(connection);
+        await context.Database.EnsureCreatedAsync();
+
+        var user = CreateUser();
+        var today = CouponBusinessTime.GetDate(DateTimeOffset.UtcNow, CouponBusinessTime.ResolveTimeZone(null));
+        var flight1 = CreateFlight(100m, today);
+        flight1.Airline = "IndiGo";
+        var flight2 = CreateFlight(100m, today.AddDays(3));
+        flight2.Airline = "IndiGo";
+        context.AddRange(user, flight1, flight2);
+        await context.SaveChangesAsync();
+
+        var couponService = new CouponService(context);
+        var bookingService = new BookingService(context, couponService);
+
+        // 1st booking earns an available coupon
+        var b1 = await bookingService.CreateBookingAsync(user.Id, CreateBookingRequest(flight1.FlightId));
+        Assert.True(b1.Success);
+
+        var earnedCoupon = Assert.Single(await couponService.GetAllCouponsAsync(user.Id));
+        Assert.Equal("Available", earnedCoupon.Status);
+
+        // 2nd booking applies that coupon
+        var b2Req = CreateBookingRequest(flight2.FlightId, earnedCoupon.CouponCode);
+        var b2 = await bookingService.CreateBookingAsync(user.Id, b2Req);
+        Assert.True(b2.Success);
+
+        // After applying, coupon status is "Used"
+        context.ChangeTracker.Clear();
+        var couponAfterApply = await context.Coupons.SingleAsync(c => c.CouponCode == earnedCoupon.CouponCode);
+        Assert.Equal("Used", couponAfterApply.Status);
+        Assert.Equal(1, couponAfterApply.UsedCount);
+        Assert.True(await context.CouponUsages.AnyAsync(u => u.BookingId == b2.Booking!.BookingId));
+
+        // Cancel the 2nd booking (the ticket where the coupon was used)
+        var cancelResult = await bookingService.CancelBookingAsync(b2.Booking!.BookingId, user.Id);
+        Assert.True(cancelResult.Success);
+
+        // The coupon used for the cancelled ticket must NOT remain in Used status; it must be changed back to Available
+        context.ChangeTracker.Clear();
+        var couponAfterCancel = await context.Coupons.SingleAsync(c => c.CouponCode == earnedCoupon.CouponCode);
+        Assert.Equal("Available", couponAfterCancel.Status);
+        Assert.Equal(0, couponAfterCancel.UsedCount);
+
+        // The coupon usage for the cancelled booking must be removed
+        Assert.False(await context.CouponUsages.AnyAsync(u => u.BookingId == b2.Booking!.BookingId));
+
+        // RefreshStatusesAsync must not revert it to "Used"
+        await couponService.RefreshStatusesAsync();
+        context.ChangeTracker.Clear();
+        var couponAfterRefresh = await context.Coupons.SingleAsync(c => c.CouponCode == earnedCoupon.CouponCode);
+        Assert.Equal("Available", couponAfterRefresh.Status);
+        Assert.Equal(0, couponAfterRefresh.UsedCount);
+
+        // Newly generated coupon for the 2nd cancelled ticket must be permanently deleted
+        Assert.False(await context.Coupons.AnyAsync(c => c.GeneratedForBookingId == b2.Booking!.BookingId));
+    }
+
     private sealed class FixedTimeProvider : TimeProvider
     {
         private readonly DateTimeOffset _utcNow;

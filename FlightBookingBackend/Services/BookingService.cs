@@ -539,6 +539,7 @@ namespace FlightBookingBackend.Services
 
             booking.BookingStatus = BookingStatuses.Cancelled;
             booking.PaymentStatus = "Refunded";
+            booking.CancelDate = DateTime.UtcNow;
 
             // Restore available seats on flight based on passenger count
             if (booking.Flight != null)
@@ -546,17 +547,30 @@ namespace FlightBookingBackend.Services
                 booking.Flight.AvailableSeats += booking.PassengerCount;
             }
 
-            var earnedCoupon = await _context.Coupons
-                .FirstOrDefaultAsync(c => c.GeneratedForBookingId == booking.BookingId);
-            if (earnedCoupon != null && earnedCoupon.UsedCount == 0)
+            // Permanently delete all coupons newly generated for this cancelled ticket
+            var earnedCoupons = await _context.Coupons
+                .Include(c => c.CouponUsages)
+                .Where(c => c.GeneratedForBookingId == booking.BookingId)
+                .ToListAsync();
+
+            booking.GeneratedCoupon = null;
+
+            foreach (var earnedCoupon in earnedCoupons)
             {
+                if (earnedCoupon.CouponUsages.Any())
+                {
+                    _context.CouponUsages.RemoveRange(earnedCoupon.CouponUsages);
+                }
                 _context.Coupons.Remove(earnedCoupon);
             }
 
-            var appliedUsage = await _context.CouponUsages
+            // Coupons used for the cancelled ticket must not remain in Used status; they must be changed back to Available
+            var appliedUsages = await _context.CouponUsages
                 .Include(u => u.Coupon)
-                .FirstOrDefaultAsync(u => u.BookingId == booking.BookingId);
-            if (appliedUsage != null)
+                .Where(u => u.BookingId == booking.BookingId)
+                .ToListAsync();
+
+            foreach (var appliedUsage in appliedUsages)
             {
                 if (appliedUsage.Coupon != null)
                 {
@@ -575,6 +589,17 @@ namespace FlightBookingBackend.Services
             if (earnedTransaction != null)
             {
                 earnedTransaction.Status = "Cancelled";
+            }
+
+            var redeemedTransaction = await _context.CouponTransactions
+                .FirstOrDefaultAsync(couponTransaction =>
+                    couponTransaction.BookingId == bookingId &&
+                    couponTransaction.UserId == userId &&
+                    couponTransaction.TransactionType == "Redeemed" &&
+                    couponTransaction.Status == "Redeemed");
+            if (redeemedTransaction != null)
+            {
+                redeemedTransaction.Status = "Cancelled";
             }
 
             await _context.SaveChangesAsync();
@@ -761,6 +786,7 @@ namespace FlightBookingBackend.Services
                     .Sum(transaction => transaction.Points),
                 BookingStatus = b.BookingStatus,
                 PaymentStatus = b.PaymentStatus,
+                CancelDate = b.CancelDate,
                 FlightNumber = b.Flight?.FlightNumber ?? "N/A",
                 Airline = b.Flight?.Airline ?? "N/A",
                 FromCity = b.Flight?.FromCity ?? "N/A",

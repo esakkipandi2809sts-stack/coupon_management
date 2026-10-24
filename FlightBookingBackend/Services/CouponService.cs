@@ -34,7 +34,8 @@ namespace FlightBookingBackend.Services
                 .AsNoTracking()
                 .Include(c => c.GeneratedForBooking)
                     .ThenInclude(b => b!.Flight)
-                .Where(c => c.UserId == userId)
+                .Where(c => c.UserId == userId &&
+                            (c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled))
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
 
@@ -49,6 +50,7 @@ namespace FlightBookingBackend.Services
                 .AsNoTracking()
                 .Include(c => c.GeneratedForBooking)
                     .ThenInclude(b => b!.Flight)
+                .Where(c => c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled)
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
             var ownerIds = coupons
@@ -75,7 +77,8 @@ namespace FlightBookingBackend.Services
         public async Task<CouponStatisticsDto> GetCouponStatisticsAsync(int userId)
         {
             await RefreshStatusesAsync();
-            var coupons = _context.Coupons.Where(c => c.UserId == userId);
+            var coupons = _context.Coupons.Where(c => c.UserId == userId &&
+                                                      (c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled));
             var totalCoupons = await coupons.CountAsync();
             var availableCoupons = await coupons.CountAsync(c => c.Status == "Available");
             var pendingCoupons = await coupons.CountAsync(c => c.Status == "Pending");
@@ -95,7 +98,9 @@ namespace FlightBookingBackend.Services
         public async Task<CouponStatisticsDto> GetCouponStatisticsForAdminAsync()
         {
             await RefreshStatusesAsync();
-            var coupons = _context.Coupons.AsNoTracking();
+            var coupons = _context.Coupons
+                .AsNoTracking()
+                .Where(c => c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled);
             return new CouponStatisticsDto
             {
                 AvailableCoupons = await coupons.CountAsync(c => c.Status == "Available"),
@@ -333,11 +338,54 @@ namespace FlightBookingBackend.Services
             var today = GetBusinessDate();
             var now = _timeProvider.GetUtcNow().UtcDateTime;
 
+            // 1. Permanently delete any coupons generated for cancelled bookings from the database
+            var cancelledBookingCoupons = await _context.Coupons
+                .Include(c => c.CouponUsages)
+                .Where(c => c.GeneratedForBooking != null && c.GeneratedForBooking.BookingStatus == BookingStatuses.Cancelled)
+                .ToListAsync();
+
+            if (cancelledBookingCoupons.Any())
+            {
+                var usagesToRemove = cancelledBookingCoupons.SelectMany(c => c.CouponUsages).ToList();
+                if (usagesToRemove.Any())
+                {
+                    _context.CouponUsages.RemoveRange(usagesToRemove);
+                }
+                _context.Coupons.RemoveRange(cancelledBookingCoupons);
+                await _context.SaveChangesAsync();
+            }
+
+            // 2. Clean up coupon usages for cancelled bookings and restore used coupons back to Available
+            var cancelledUsages = await _context.CouponUsages
+                .Include(u => u.Coupon)
+                .Include(u => u.Booking)
+                .Where(u => u.Booking != null && u.Booking.BookingStatus == BookingStatuses.Cancelled)
+                .ToListAsync();
+
+            if (cancelledUsages.Any())
+            {
+                foreach (var usage in cancelledUsages)
+                {
+                    if (usage.Coupon != null)
+                    {
+                        usage.Coupon.UsedCount = Math.Max(0, usage.Coupon.UsedCount - 1);
+                        if (usage.Coupon.UsedCount < usage.Coupon.TotalUsageLimit && usage.Coupon.ExpiryDate > now)
+                        {
+                            usage.Coupon.Status = "Available";
+                        }
+                    }
+                }
+                _context.CouponUsages.RemoveRange(cancelledUsages);
+                await _context.SaveChangesAsync();
+            }
+
+            // 3. Update status of coupons used by active bookings
             await _context.Coupons
                 .Where(c => c.Status != "Used" &&
-                            (c.UsedCount >= c.TotalUsageLimit || c.CouponUsages.Any()))
+                            (c.UsedCount >= c.TotalUsageLimit || c.CouponUsages.Any(u => u.Booking != null && u.Booking.BookingStatus != BookingStatuses.Cancelled)))
                 .ExecuteUpdateAsync(updates => updates.SetProperty(c => c.Status, "Used"));
 
+            // 5. Update expired
             await _context.Coupons
                 .Where(c => c.Status == "Inactive")
                 .ExecuteUpdateAsync(updates => updates.SetProperty(c => c.Status, "Expired"));
@@ -347,10 +395,12 @@ namespace FlightBookingBackend.Services
                             c.ExpiryDate <= now)
                 .ExecuteUpdateAsync(updates => updates.SetProperty(c => c.Status, "Expired"));
 
+            // 6. Update pending to available
             await _context.Coupons
                 .Where(c => c.Status == "Pending" &&
                             c.GeneratedForBooking != null &&
                             c.GeneratedForBooking.Flight != null &&
+                            c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled &&
                             c.GeneratedForBooking.Flight.DepartureDate <= today &&
                             c.ExpiryDate > now)
                 .ExecuteUpdateAsync(updates => updates.SetProperty(c => c.Status, "Available"));
@@ -388,6 +438,7 @@ namespace FlightBookingBackend.Services
                 CreatedAt = c.CreatedAt,
                 JourneyDate = scheduledDepartureDate ?? c.JourneyDate,
                 BookingReference = c.GeneratedForBooking?.BookingReference,
+                BookingStatus = c.GeneratedForBooking?.BookingStatus,
                 AvailableFromDate = scheduledDepartureDate ?? c.AvailableFromDate
             };
         }

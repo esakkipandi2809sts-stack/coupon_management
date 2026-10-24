@@ -78,6 +78,9 @@ namespace FlightBookingBackend.Models
         [MaxLength(50)]
         public string PaymentStatus { get; set; } = "Paid"; // "Paid", "Pending", "Failed"
 
+        [Column(TypeName = "datetime2")]
+        public DateTime? CancelDate { get; set; }
+
         // Foreign keys and Navigation properties
         [ForeignKey("UserId")]
         public virtual User? User { get; set; }

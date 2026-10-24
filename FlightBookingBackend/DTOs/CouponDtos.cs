@@ -23,6 +23,7 @@ namespace FlightBookingBackend.DTOs
         public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public string? BookingReference { get; set; }
+        public string? BookingStatus { get; set; }
         public DateOnly? JourneyDate { get; set; }
         public DateOnly? AvailableFromDate { get; set; }
     }
