@@ -35,5 +35,6 @@ namespace FlightBookingBackend.DTOs
         public string PaymentStatus { get; set; } = string.Empty;
         public string SeatNumber { get; set; } = string.Empty;
         public string Class { get; set; } = string.Empty;
+        public DateTime? CancelDate { get; set; }
     }
 }

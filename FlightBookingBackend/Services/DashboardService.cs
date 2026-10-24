@@ -92,7 +92,8 @@ namespace FlightBookingBackend.Services
                 BookingStatus = b.BookingStatus,
                 PaymentStatus = b.PaymentStatus,
                 SeatNumber = b.SeatNumber,
-                Class = b.Class
+                Class = b.Class,
+                CancelDate = b.CancelDate
             });
         }
     }
