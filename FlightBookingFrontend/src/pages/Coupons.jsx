@@ -407,7 +407,7 @@ export default function Coupons() {
             /* Table View */
             <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', whiteSpace: 'nowrap', }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', whiteSpace: 'nowrap', textAlign: 'center' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                       <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Coupon Code</th>
@@ -415,12 +415,11 @@ export default function Coupons() {
                       <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Points & %</th>
                       <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Discount</th>
                       <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Fare / Final</th>
-                      <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Booking Reference</th>
-                      <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Generated Date</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Booking ID</th>
+                      <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Booking Date</th>
                       <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Expiry Date</th>
                       <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Usage</th>
                       <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Status</th>
-                      {/* <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569', textAlign: 'right' }}>Action</th> */}
                     </tr>
                   </thead>
                   <tbody>
@@ -456,7 +455,10 @@ export default function Coupons() {
                           {c.bookingReference || '—'}
                         </td>
                         <td style={{ padding: '14px 18px', color: '#64748b' }}>
-                          {new Date(c.expiryDate).toLocaleDateString()}
+                          {c.bookingDate || c.createdAt ? new Date(c.bookingDate || c.createdAt).toLocaleDateString() : '—'}
+                        </td>
+                        <td style={{ padding: '14px 18px', color: '#64748b' }}>
+                          {c.expiryDate ? new Date(c.expiryDate).toLocaleDateString() : '—'}
                         </td>
                         <td style={{ padding: '14px 18px', color: '#475569' }}>
                           {c.usedCount} / {c.totalUsageLimit}
@@ -468,22 +470,6 @@ export default function Coupons() {
                             }`}>
                             {c.status}
                           </span>
-                        </td>
-                        <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                          <button
-                            onClick={() => handleCopy(c.couponCode)}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: '8px',
-                              backgroundColor: copiedCode === c.couponCode ? '#ecfdf5' : '#f8fafc',
-                              color: copiedCode === c.couponCode ? '#059669' : '#334155',
-                              border: '1px solid #e2e8f0',
-                              fontSize: '0.8rem',
-                              fontWeight: 600
-                            }}
-                          >
-                            {copiedCode === c.couponCode ? 'Copied' : 'Copy'}
-                          </button>
                         </td>
                       </tr>
                     ))}

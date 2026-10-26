@@ -564,6 +564,7 @@ namespace FlightBookingBackend.Services
                 CreatedAt = c.CreatedAt,
                 JourneyDate = scheduledDepartureDate ?? c.JourneyDate,
                 BookingReference = c.GeneratedForBooking?.BookingReference,
+                BookingDate = c.GeneratedForBooking?.BookingDate ?? c.CreatedAt,
                 BookingStatus = c.GeneratedForBooking?.BookingStatus,
                 AvailableFromDate = scheduledDepartureDate ?? c.AvailableFromDate
             };
