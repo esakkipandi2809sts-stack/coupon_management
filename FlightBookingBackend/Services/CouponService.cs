@@ -261,8 +261,12 @@ namespace FlightBookingBackend.Services
                 };
             }
 
-            if (coupon.GeneratedForBooking?.Flight == null ||
-                coupon.GeneratedForBooking.Flight.DepartureDate > GetBusinessDate())
+            // Enforce the flight-date restriction only for booking-linked coupons.
+            // Points-converted coupons have no linked booking (GeneratedForBooking == null)
+            // and must be allowed through regardless of any flight date.
+            if (coupon.GeneratedForBooking != null &&
+                (coupon.GeneratedForBooking.Flight == null ||
+                 coupon.GeneratedForBooking.Flight.DepartureDate > GetBusinessDate()))
             {
                 return new CouponValidationResultDto
                 {
@@ -427,7 +431,7 @@ namespace FlightBookingBackend.Services
                 ExpiryDate = now.AddYears(1),
                 TotalUsageLimit = 1,
                 UsedCount = 0,
-                Status = "Available",
+                Status = "Pending",
                 CreatedAt = now,
                 UserId = userId,
                 GeneratedForBookingId = null
@@ -440,7 +444,8 @@ namespace FlightBookingBackend.Services
                 CouponCode = couponCode,
                 DiscountAmount = discountAmount,
                 PointsRedeemed = points,
-                ExpiryDate = coupon.ExpiryDate
+                ExpiryDate = coupon.ExpiryDate,
+                Status = coupon.Status
             });
         }
 

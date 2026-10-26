@@ -3,6 +3,17 @@ import { Tag, Copy, Check, Award } from 'lucide-react';
 import { formatINR } from '../utils/flightPricing';
 
 export default function CouponCard({ coupon, onApply }) {
+  if (!coupon) return null;
+
+  // Newly generated coupons (created from points via Create Coupon) must not be displayed in the coupon-card component
+  const isCreatedFromPoints =
+    coupon.description?.toLowerCase().includes('points redemption') ||
+    (!coupon.bookingReference && (!coupon.originalFlightFare || Number(coupon.originalFlightFare) === 0));
+
+  if (isCreatedFromPoints) {
+    return null;
+  }
+
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {

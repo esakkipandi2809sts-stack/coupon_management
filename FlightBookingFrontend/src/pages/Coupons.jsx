@@ -86,6 +86,12 @@ export default function Coupons() {
   // Filter coupons by tab and search
   const filteredCoupons = coupons.filter((c) => {
     if (c.bookingStatus === 'Cancelled') return false;
+    if (
+      c.description?.toLowerCase().includes('points redemption') ||
+      (!c.bookingReference && (!c.originalFlightFare || Number(c.originalFlightFare) === 0))
+    ) {
+      return false;
+    }
     if (activeTab === 'available' && c.status.toLowerCase() !== 'available') return false;
     if (activeTab === 'pending' && c.status.toLowerCase() !== 'pending') return false;
     if (activeTab === 'used' && c.status.toLowerCase() !== 'used') return false;

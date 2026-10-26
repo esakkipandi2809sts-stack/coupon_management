@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Plane, Clock, User, Tag, CheckCircle, AlertCircle, CreditCard,
-  ShieldCheck, ChevronRight, ArrowRight
+  ShieldCheck, ChevronRight, ArrowRight, ChevronDown
 } from 'lucide-react';
 
 import { bookingApi, couponApi } from '../services/api';
@@ -96,12 +96,16 @@ export default function FlightBooking() {
   const [couponsLoading, setCouponsLoading] = useState(true);
   const [couponsError, setCouponsError] = useState('');
   const [passengerCoupons, setPassengerCoupons] = useState([]);
+  const [showCouponDropdown, setShowCouponDropdown] = useState(false);
+  const couponDropdownRef = useRef(null);
 
   const [couponBalance, setCouponBalance] = useState(null);
   const [couponBalanceError, setCouponBalanceError] = useState('');
 
   // Create-coupon-from-points state
   const [creatingCoupon, setCreatingCoupon] = useState(false);
+  // Discount amount of the most recently created (but not yet applied) coupon
+  const [createdCouponDiscount, setCreatedCouponDiscount] = useState(0);
 
   // Points are only used to CREATE a coupon; the coupon is then applied via the code box.
   const [pointsToRedeem, setPointsToRedeem] = useState('');
@@ -149,6 +153,16 @@ export default function FlightBooking() {
     loadPassengerCoupons();
     loadCouponBalance();
   }, [loadPassengerCoupons, loadCouponBalance]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (couponDropdownRef.current && !couponDropdownRef.current.contains(event.target)) {
+        setShowCouponDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const updatePassenger = (index, field, value) => {
     setPassengers(previous => previous.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
@@ -251,26 +265,39 @@ export default function FlightBooking() {
     (sum, coupon) => sum + Math.max(0, Number(coupon.discountAmount) || 0), 0
   );
 
+  // Discount from applied coupon codes, capped to baseFarePerPassenger
   const discountAmount = Math.round(Math.min(
     rawCouponDiscount,
-    Number.isFinite(originalFare) ? Math.max(0, originalFare) : 0
+    baseFarePerPassenger
   ));
-
-  const remainingFare = Math.max(0, (Number.isFinite(originalFare) ? originalFare : 0) - discountAmount);
 
   const availableCouponPoints = Math.max(0, Math.floor(Number(couponBalance?.availablePoints) || 0));
 
   const parsedPoints = pointsToRedeem === '' ? 0 : Number(pointsToRedeem);
   const validPointsInput = Number.isInteger(parsedPoints) && parsedPoints >= 0;
 
-  // 10 points = Rs.1
+  // 10 points = ₹1  (preview value shown before "Create Coupon" is clicked)
   const couponPreviewValue = validPointsInput && parsedPoints > 0 ? Math.floor(parsedPoints / 10) : 0;
 
-  // Final amount: only applied coupons reduce the fare (points are converted to a coupon first).
-  const totalAmount = Math.max(
-    0,
-    Math.round((Number.isFinite(originalFare) ? originalFare : 0) - discountAmount)
+  // Combined discount: applied coupon codes + live points preview + created-but-not-yet-applied coupon
+  // Capped so it never exceeds the base fare
+  const totalDiscountAmount = Math.min(
+    discountAmount + couponPreviewValue + createdCouponDiscount,
+    baseFarePerPassenger
   );
+
+  const remainingFare = Math.max(0, baseFarePerPassenger - totalDiscountAmount);
+
+  // Final Payable Amount = Base Fare per Passenger − Total Coupon Discount
+  const totalAmount = Math.max(0, baseFarePerPassenger - totalDiscountAmount);
+
+  // Available coupons not already applied (only one available coupon code displayed at a time)
+  const unappliedPassengerCoupons = passengerCoupons.filter(coupon => {
+    const code = (coupon.couponCode || coupon.code || '').trim().toUpperCase();
+    const isAvailable = (coupon.status || 'Available').toLowerCase() === 'available';
+    return code && isAvailable && !appliedCoupons.some(c => (c.couponCode || c.code || '').trim().toUpperCase() === code);
+  });
+  const displayedAvailableCoupons = unappliedPassengerCoupons.slice(0, 1);
 
   // ---------------- CREATE COUPON FROM POINTS ----------------
 
@@ -306,11 +333,13 @@ export default function FlightBooking() {
         throw new Error('The server did not return a coupon code.');
       }
 
-      // Show the new code in the coupon input box; the user then clicks Apply.
-      setCouponCode(String(createdCode).toUpperCase());
+      // Leave the coupon input empty — the user must enter the code manually.
+      const discount = Math.floor(parsedPoints / 10);
       setPointsToRedeem('');
+      setCouponCode('');
+      setCreatedCouponDiscount(discount);
       setCouponSuccess(
-        `Coupon ${String(createdCode).toUpperCase()} created successfully! ${parsedPoints} points deducted from your account. Click Apply to use it.`
+        `Coupon ${String(createdCode).toUpperCase()} created successfully! ${parsedPoints} points deducted.`
       );
 
       await loadCouponBalance();
@@ -360,6 +389,8 @@ export default function FlightBooking() {
           return [...previous, validatedCoupon];
         });
 
+        // The created coupon is now tracked via appliedCoupons; clear the separate preview.
+        setCreatedCouponDiscount(0);
         setPointsToRedeem('');
         setCouponCode('');
         setCouponSuccess(data.message || `${code} applied successfully.`);
@@ -385,6 +416,7 @@ export default function FlightBooking() {
     setCouponCode('');
     setCouponSuccess('');
     setCouponError('');
+    setCreatedCouponDiscount(0);
   };
 
   // ---------------- CONFIRM BOOKING ----------------
@@ -826,7 +858,7 @@ export default function FlightBooking() {
               </p>
 
               <p style={{ fontSize: '0.85rem', fontWeight: 500, color: '#2563eb', margin: 0 }}>
-                ≈ ₹{!couponBalance ? '…' : (availableCouponPoints / 10).toFixed(2)} Cash Equivalent
+                ≈ ₹{!couponBalance ? '…' : (availableCouponPoints / 10).toFixed(1)} Cash Equivalent
               </p>
 
               {couponBalanceError && (
@@ -854,34 +886,190 @@ export default function FlightBooking() {
               )}
             </div>
 
-            {appliedCoupons.map(coupon => (
-              <div key={coupon.couponCode} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                gap: 8, color: '#059669', marginBottom: 8
-              }}>
-                <span style={{ overflowWrap: 'anywhere' }}>{coupon.couponCode}</span>
 
-                <strong>{formatINR(Number(coupon.discountAmount) || 0)}</strong>
 
-                <button
-                  type="button"
-                  onClick={() => handleRemoveCoupon(coupon.couponCode)}
-                  style={{ border: 0, background: 'transparent', color: '#dc2626', cursor: 'pointer' }}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+            <form onSubmit={e => { e.preventDefault(); setShowCouponDropdown(false); handleApplyCoupon(); }}>
+              <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
+                <div ref={couponDropdownRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+                  <input
+                    type="text"
+                    list="available-coupons-list"
+                    value={couponCode}
+                    onChange={e => {
+                      setCouponCode(e.target.value.toUpperCase());
+                      setShowCouponDropdown(true);
+                    }}
+                    onFocus={() => {
+                      if (displayedAvailableCoupons.length > 0) setShowCouponDropdown(true);
+                    }}
+                    placeholder={displayedAvailableCoupons.length > 0 ? "Enter or select coupon code" : "Enter coupon code"}
+                    style={{
+                      ...styles.input,
+                      minWidth: 0,
+                      paddingRight: displayedAvailableCoupons.length > 0 ? 34 : 12
+                    }}
+                    autoComplete="off"
+                  />
 
-            <form onSubmit={e => { e.preventDefault(); handleApplyCoupon(); }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={e => setCouponCode(e.target.value.toUpperCase())}
-                  placeholder="Enter coupon code"
-                  style={{ ...styles.input, minWidth: 0, flex: 1 }}
-                />
+                  {displayedAvailableCoupons.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCouponDropdown(prev => !prev)}
+                      title="Show available coupon"
+                      aria-label="Toggle available coupon dropdown"
+                      style={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#64748b',
+                        cursor: 'pointer',
+                        padding: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 4
+                      }}
+                    >
+                      <ChevronDown
+                        size={18}
+                        style={{
+                          transform: showCouponDropdown ? 'rotate(180deg)' : 'none',
+                          transition: 'transform 0.2s ease'
+                        }}
+                      />
+                    </button>
+                  )}
+
+                  <datalist id="available-coupons-list">
+                    {displayedAvailableCoupons.map((coupon, idx) => {
+                      const code = (coupon.couponCode || coupon.code || '').trim().toUpperCase();
+                      const discountText = coupon.discountPercentage
+                        ? `${coupon.discountPercentage}% OFF`
+                        : coupon.discountAmount
+                          ? `₹${coupon.discountAmount} OFF`
+                          : coupon.discountValue
+                            ? `${coupon.discountType === 'Percentage' ? `${coupon.discountValue}%` : `₹${coupon.discountValue}`} OFF`
+                            : '';
+                      return (
+                        <option key={coupon.couponId || code || idx} value={code}>
+                          {discountText ? `${code} - ${discountText}` : code}
+                        </option>
+                      );
+                    })}
+                  </datalist>
+
+                  {showCouponDropdown && displayedAvailableCoupons.length > 0 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 4px)',
+                        left: 0,
+                        right: 0,
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 10,
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
+                        maxHeight: 220,
+                        overflowY: 'auto',
+                        zIndex: 100
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: '8px 12px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          color: '#64748b',
+                          background: '#f8fafc',
+                          borderBottom: '1px solid #e2e8f0',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <span>Available Coupon</span>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 500, color: '#94a3b8' }}>Click to select</span>
+                      </div>
+                      {displayedAvailableCoupons
+                        .filter(c => {
+                          const code = (c.couponCode || c.code || '').toUpperCase();
+                          if (!couponCode) return true;
+                          return code.includes(couponCode.toUpperCase());
+                        })
+                        .map((c, idx) => {
+                          const code = (c.couponCode || c.code || '').toUpperCase();
+                          const discountText = c.discountPercentage
+                            ? `${c.discountPercentage}% OFF`
+                            : c.discountAmount
+                              ? `₹${c.discountAmount} OFF`
+                              : c.discountValue
+                                ? `${c.discountType === 'Percentage' ? `${c.discountValue}%` : `₹${c.discountValue}`} OFF`
+                                : '';
+                          const isSelected = couponCode === code;
+                          return (
+                            <div
+                              key={c.couponId || code || idx}
+                              onClick={() => {
+                                setCouponCode(code);
+                                setShowCouponDropdown(false);
+                              }}
+                              style={{
+                                padding: '10px 12px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid #f1f5f9',
+                                background: isSelected ? '#f0f9ff' : '#ffffff',
+                                transition: 'background 0.15s'
+                              }}
+                              onMouseEnter={e => {
+                                if (!isSelected) e.currentTarget.style.background = '#f8fafc';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = isSelected ? '#f0f9ff' : '#ffffff';
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Tag size={14} color="#0284c7" />
+                                <span style={{ fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                                  {code}
+                                </span>
+                              </div>
+                              {discountText && (
+                                <span
+                                  style={{
+                                    background: '#ecfdf5',
+                                    color: '#059669',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    padding: '2px 8px',
+                                    borderRadius: 6
+                                  }}
+                                >
+                                  {discountText}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      {displayedAvailableCoupons.filter(c => {
+                        const code = (c.couponCode || c.code || '').toUpperCase();
+                        if (!couponCode) return true;
+                        return code.includes(couponCode.toUpperCase());
+                      }).length === 0 && (
+                        <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
+                          No matching available coupon
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <button
                   type="submit"
@@ -896,6 +1084,41 @@ export default function FlightBooking() {
                   {couponLoading ? 'Checking...' : 'Apply'}
                 </button>
               </div>
+
+              {displayedAvailableCoupons.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Available:</span>
+                  {displayedAvailableCoupons.map((c, idx) => {
+                    const code = (c.couponCode || c.code || '').toUpperCase();
+                    const isSelected = couponCode === code;
+                    return (
+                      <button
+                        key={c.couponId || code || idx}
+                        type="button"
+                        onClick={() => {
+                          setCouponCode(code);
+                          setShowCouponDropdown(false);
+                        }}
+                        style={{
+                          border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                          background: isSelected ? '#0284c7' : '#f8fafc',
+                          color: isSelected ? '#ffffff' : '#0284c7',
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          fontFamily: 'monospace',
+                          transition: 'all 0.15s'
+                        }}
+                        title={`Click to select ${code}`}
+                      >
+                        {code}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </form>
 
             {couponSuccess && (
@@ -931,6 +1154,7 @@ export default function FlightBooking() {
               <input
                 type="number"
                 min="0"
+                max={availableCouponPoints}
                 step="1"
                 value={pointsToRedeem}
                 disabled={pointsInputDisabled}
@@ -945,10 +1169,12 @@ export default function FlightBooking() {
                   const requested = Number(value);
 
                   if (Number.isInteger(requested) && requested >= 0) {
-                    setPointsToRedeem(String(requested));
+                    // Clamp to the user's available balance
+                    const clamped = Math.min(requested, availableCouponPoints);
+                    setPointsToRedeem(String(clamped));
                   }
                 }}
-                placeholder="Enter points, e.g. 200"
+                placeholder={`Enter points, e.g. ${availableCouponPoints}`}
                 style={{
                   ...styles.input,
                   background: pointsInputDisabled ? '#f1f5f9' : '#fff'
@@ -982,7 +1208,7 @@ export default function FlightBooking() {
               </div>
 
               <small style={{ display: 'block', color: '#64748b', marginTop: 6 }}>
-                Available: {availableCouponPoints} points 
+                Available: {availableCouponPoints} points
               </small>
 
               {appliedCoupons.length > 0 && (
@@ -1039,20 +1265,13 @@ export default function FlightBooking() {
                 <strong>{fareAvailable ? formatINR(originalFare) : 'Unavailable'}</strong>
               </div>
 
-              {appliedCoupons.map(coupon => (
-                <div key={coupon.couponCode} style={{
-                  display: 'flex', justifyContent: 'space-between', gap: 12, color: '#059669'
-                }}>
-                  <span style={{ overflowWrap: 'anywhere' }}>{coupon.couponCode}</span>
-                  <strong>-{formatINR(Math.max(0, Number(coupon.discountAmount) || 0))}</strong>
-                </div>
-              ))}
+
 
               <div style={{
                 display: 'flex', justifyContent: 'space-between', gap: 12, color: '#059669'
               }}>
                 <span>Total coupon discount</span>
-                <strong>-{formatINR(discountAmount)}</strong>
+                <strong>-{formatINR(totalDiscountAmount)}</strong>
               </div>
 
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>

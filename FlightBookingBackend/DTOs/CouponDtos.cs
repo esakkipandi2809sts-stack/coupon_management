@@ -92,5 +92,6 @@ namespace FlightBookingBackend.DTOs
         public decimal DiscountAmount { get; set; }
         public int PointsRedeemed { get; set; }
         public DateTime ExpiryDate { get; set; }
+        public string Status { get; set; } = "Pending";
     }
 }
