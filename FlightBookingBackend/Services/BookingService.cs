@@ -129,25 +129,8 @@ namespace FlightBookingBackend.Services
                     return (false, $"Only {flight.AvailableSeats} seats are available for this flight.", null);
                 }
 
-                var balanceTransactions = await _context.CouponTransactions
-                    .Where(couponTransaction => couponTransaction.UserId == userId &&
-                                                ((couponTransaction.TransactionType == "Earned" &&
-                                                  couponTransaction.Status == "Available") ||
-                                                 (couponTransaction.TransactionType == "Redeemed" &&
-                                                  couponTransaction.Status == "Redeemed")))
-                    .Select(couponTransaction => new
-                    {
-                        couponTransaction.TransactionType,
-                        couponTransaction.Points
-                    })
-                    .ToListAsync();
-                var availableEarnedPoints = balanceTransactions
-                    .Where(couponTransaction => couponTransaction.TransactionType == "Earned")
-                    .Sum(couponTransaction => couponTransaction.Points);
-                var previouslyRedeemedPoints = balanceTransactions
-                    .Where(couponTransaction => couponTransaction.TransactionType == "Redeemed")
-                    .Sum(couponTransaction => couponTransaction.Points);
-                var availableCouponPoints = Math.Max(0m, availableEarnedPoints - previouslyRedeemedPoints);
+                var couponBalance = await _couponService.GetCouponBalanceAsync(userId);
+                var availableCouponPoints = couponBalance.AvailablePoints;
                 var remainingFareAfterCoupon = Math.Max(0m, baseFare - couponDiscountAmount);
 
                 // Prevent double discount application: If a coupon is applied, do not also redeem points discount
@@ -578,6 +561,7 @@ namespace FlightBookingBackend.Services
             }
 
             await _context.SaveChangesAsync();
+            await _couponService.GetCouponBalanceAsync(booking.UserId);
             await transaction.CommitAsync();
             return (true, "Ticket cancelled successfully. Booking status updated to Cancelled.");
         }

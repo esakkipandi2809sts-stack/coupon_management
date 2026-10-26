@@ -1152,8 +1152,7 @@ export default function FlightBooking() {
               <label style={styles.label}>Points to Convert into Coupon</label>
 
               <input
-                type="number"
-                min="0"
+                type="number"                
                 max={availableCouponPoints}
                 step="1"
                 value={pointsToRedeem}

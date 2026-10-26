@@ -126,7 +126,9 @@ namespace FlightBookingBackend.Services
         {
             await RefreshStatusesAsync();
 
-            // Synchronize earned transactions with their coupon's current status
+            bool hasChanges = false;
+
+            // 1. Synchronize earned transactions with their coupon's current status
             var earnedWithCoupons = await (
                 from t in _context.CouponTransactions
                 join c in _context.Coupons on t.BookingId equals c.GeneratedForBookingId
@@ -134,7 +136,6 @@ namespace FlightBookingBackend.Services
                 select new { Transaction = t, CouponStatus = c.Status }
             ).ToListAsync();
 
-            bool hasChanges = false;
             foreach (var item in earnedWithCoupons)
             {
                 if (item.CouponStatus == "Pending" && item.Transaction.Status != "Pending")
@@ -146,6 +147,74 @@ namespace FlightBookingBackend.Services
                 {
                     item.Transaction.Status = "Available";
                     hasChanges = true;
+                }
+            }
+
+            // 2. Cancel direct redemptions for cancelled bookings
+            var cancelledBookingRedeemedTx = await (
+                from t in _context.CouponTransactions
+                join b in _context.Bookings on t.BookingId equals b.BookingId
+                where t.UserId == userId && t.TransactionType == "Redeemed" && t.Status == "Redeemed" && b.BookingStatus == BookingStatuses.Cancelled
+                select t
+            ).ToListAsync();
+
+            foreach (var tx in cancelledBookingRedeemedTx)
+            {
+                tx.Status = "Cancelled";
+                hasChanges = true;
+            }
+
+            // 3. Reconcile point-to-coupon transactions:
+            // A point coupon requires valid non-cancelled bookings to fund it.
+            // If all bookings prior to a point coupon's creation were cancelled, or if total redeemed exceeds earned points,
+            // cancel those unused orphaned coupons and their corresponding redeemed transactions.
+            var allUserTransactions = await _context.CouponTransactions
+                .Where(t => t.UserId == userId)
+                .ToListAsync();
+
+            var earnedAvailable = allUserTransactions
+                .Where(t => t.TransactionType == "Earned" && t.Status == "Available")
+                .Sum(t => t.Points);
+            var currentRedeemed = allUserTransactions
+                .Where(t => t.TransactionType == "Redeemed" && t.Status == "Redeemed")
+                .Sum(t => t.Points);
+
+            var pointCoupons = await _context.Coupons
+                .Where(c => c.UserId == userId && c.GeneratedForBookingId == null && c.UsedCount == 0 && c.Status != "Used" && c.Status != "Cancelled")
+                .OrderBy(c => c.CreatedAt)
+                .ToListAsync();
+
+            if (pointCoupons.Any())
+            {
+                var pointRedeemedTx = allUserTransactions
+                    .Where(t => t.TransactionType == "Redeemed" && t.Status == "Redeemed" && t.BookingId == null)
+                    .OrderBy(t => t.TransactionDate)
+                    .ToList();
+
+                var activeBookings = await _context.Bookings
+                    .AsNoTracking()
+                    .Where(b => b.UserId == userId && b.BookingStatus != BookingStatuses.Cancelled)
+                    .ToListAsync();
+
+                foreach (var coupon in pointCoupons)
+                {
+                    // Was there any active (non-cancelled) booking existing when this coupon was created?
+                    bool fundedByActiveBooking = activeBookings.Any(b => b.BookingDate <= coupon.CreatedAt.AddSeconds(10));
+
+                    if (!fundedByActiveBooking || currentRedeemed > earnedAvailable)
+                    {
+                        coupon.Status = "Cancelled";
+                        hasChanges = true;
+
+                        var matchingTx = pointRedeemedTx.FirstOrDefault(t => t.Status == "Redeemed" && Math.Abs(t.Points - coupon.CouponPoints) < 0.01m && t.TransactionDate <= coupon.CreatedAt.AddSeconds(10))
+                                         ?? pointRedeemedTx.FirstOrDefault(t => t.Status == "Redeemed");
+                        if (matchingTx != null)
+                        {
+                            matchingTx.Status = "Cancelled";
+                            currentRedeemed -= matchingTx.Points;
+                            hasChanges = true;
+                        }
+                    }
                 }
             }
 
@@ -181,7 +250,7 @@ namespace FlightBookingBackend.Services
                 AvailablePoints = available,
                 PendingPoints = pending,
                 RedeemedPoints = redeemed,
-                TotalPoints = available + pending + redeemed,
+                TotalPoints = earned + pending,
                 AvailableDiscountAmount = Math.Floor(available / 10m)
             };
         }
