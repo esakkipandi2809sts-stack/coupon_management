@@ -239,6 +239,10 @@ IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', 
 IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', N'PassengerCount') IS NULL
     ALTER TABLE dbo.Bookings ADD PassengerCount INT NOT NULL
         CONSTRAINT DF_Bookings_PassengerCount DEFAULT 1 WITH VALUES;
+IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', N'PassengerDetails') IS NULL
+    ALTER TABLE dbo.Bookings ADD PassengerDetails NVARCHAR(MAX) NULL;
+IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', N'PassengerDob') IS NULL
+    ALTER TABLE dbo.Bookings ADD PassengerDob DATE NULL;
 ");
 
             context.Database.ExecuteSqlRaw(@"

@@ -39,6 +39,23 @@ namespace FlightBookingBackend.DTOs
         public bool RedeemCouponPoints { get; set; }
 
         public string? PaymentMethod { get; set; } = "Credit Card";
+        public string? PassengerDob { get; set; }
+        public string? DateOfBirth { get; set; }
+        public List<PassengerDto>? Passengers { get; set; }
+    }
+
+    public class PassengerDto
+    {
+        public string? Title { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string? Dob { get; set; }
+        public int Age { get; set; }
+        public string? Gender { get; set; }
+        public string? Seat { get; set; }
     }
 
     public class RescheduleBookingDto
@@ -60,11 +77,15 @@ namespace FlightBookingBackend.DTOs
         public string PassengerName { get; set; } = string.Empty;
         public string PassengerEmail { get; set; } = string.Empty;
         public string PassengerPhone { get; set; } = string.Empty;
+        public DateOnly? PassengerDob { get; set; }
+        public string? DateOfBirth { get; set; }
         public int PassengerAge { get; set; }
         public string PassengerGender { get; set; } = string.Empty;
         public string SeatNumber { get; set; } = string.Empty;
         public string Class { get; set; } = string.Empty;
         public int PassengerCount { get; set; } = 1;
+        public string? PassengerDetails { get; set; }
+        public List<PassengerDto>? Passengers { get; set; }
         public DateTime BookingDate { get; set; }
         public DateOnly? FlightJourneyDate { get; set; }
         public decimal? DistanceKm { get; set; }
@@ -90,6 +111,8 @@ namespace FlightBookingBackend.DTOs
         public DateOnly ArrivalDate { get; set; }
         public string ArrivalTime { get; set; } = string.Empty;
         public string Duration { get; set; } = string.Empty;
+        public int AvailableSeats { get; set; }
+        public int TotalSeats { get; set; }
         public string? AppliedCouponCode { get; set; }
         public string? GeneratedCouponCode { get; set; }
         public string? GeneratedCouponStatus { get; set; }

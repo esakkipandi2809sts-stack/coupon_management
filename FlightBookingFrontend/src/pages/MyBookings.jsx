@@ -49,6 +49,25 @@ const formatDisplayDate = (dateVal) => {
   });
 };
 
+const BASE_FLIGHT_SEATS = [
+  '11A', '11B', '12A', '12B', '13A', '13B', '14A', '14B',
+  '15A', '15B', '16C', '16D', '17C', '17D', '18C', '18D',
+  '19C', '19D', '20C', '20D'
+];
+
+const getFlightSeats = () => {
+  const letters = ['A', 'B'];
+  const seats = [];
+
+  for (let row = 11; row <= 20; row++) {
+    for (const letter of letters) {
+      seats.push(`${row}${letter}`);
+    }
+  }
+
+  return seats;
+};
+
 export default function MyBookings() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -72,14 +91,49 @@ export default function MyBookings() {
   const [rescheduleSeat, setRescheduleSeat] = useState('');
   const [rescheduleError, setRescheduleError] = useState('');
   const [rescheduling, setRescheduling] = useState(false);
+  const [bookedSeatsForFlight, setBookedSeatsForFlight] = useState([]);
+  const [loadingBookedSeats, setLoadingBookedSeats] = useState(false);
 
   const fetchBookings = async () => {
     setLoading(true);
     setErrorMessage('');
 
     try {
-      const res = await bookingApi.getMyBookings();
-      const sorted = (Array.isArray(res.data) ? res.data : [])
+      const [bookingsRes, flightsRes] = await Promise.allSettled([
+        bookingApi.getMyBookings(),
+        flightApi.getAll(),
+      ]);
+
+      if (bookingsRes.status !== 'fulfilled') {
+        throw bookingsRes.reason;
+      }
+
+      const flights =
+        flightsRes.status === 'fulfilled' && Array.isArray(flightsRes.value?.data)
+          ? flightsRes.value.data
+          : [];
+      const flightMap = new Map(flights.map((f) => [String(f.flightId), f]));
+
+      const rawBookings = Array.isArray(bookingsRes.value?.data)
+        ? bookingsRes.value.data
+        : [];
+
+      const enriched = rawBookings.map((b) => {
+        const flight = flightMap.get(String(b.flightId));
+        return {
+          ...b,
+          availableSeats:
+            b.availableSeats != null
+              ? b.availableSeats
+              : (flight?.availableSeats ?? null),
+          totalSeats:
+            b.totalSeats != null
+              ? b.totalSeats
+              : (flight?.totalSeats ?? null),
+        };
+      });
+
+      const sorted = enriched
         .slice()
         .sort((a, b) => new Date(b.bookingDate) - new Date(a.bookingDate));
       setBookings(sorted);
@@ -160,6 +214,8 @@ export default function MyBookings() {
     setSelectedFlightId('');
     setRescheduleSeat('');
     setRescheduleError('');
+    setBookedSeatsForFlight([]);
+    setLoadingBookedSeats(false);
   };
 
   const handleReschedule = async (bookingOrId) => {
@@ -209,7 +265,21 @@ export default function MyBookings() {
       setFlightOptions(availableFlights);
 
       if (availableFlights.length > 0) {
-        setSelectedDate(dateOnly(availableFlights[0].departureDate));
+        const sameDateFlight = availableFlights.find(
+          (f) => dateOnly(f.departureDate) === dateOnly(booking.departureDate)
+        );
+        const initialDate = sameDateFlight
+          ? dateOnly(sameDateFlight.departureDate)
+          : dateOnly(availableFlights[0].departureDate);
+
+        setSelectedDate(initialDate);
+
+        const initialFlights = availableFlights.filter(
+          (f) => dateOnly(f.departureDate) === initialDate
+        );
+        if (initialFlights.length > 0) {
+          setSelectedFlightId(String(initialFlights[0].flightId));
+        }
       }
     } catch (err) {
       console.error('Failed to load reschedule flights:', err);
@@ -232,15 +302,74 @@ export default function MyBookings() {
   );
 
   useEffect(() => {
-    if (
-      selectedFlightId &&
-      !flightsForSelectedDate.some(
+    if (flightsForSelectedDate.length > 0) {
+      const isCurrentFlightValid = flightsForSelectedDate.some(
         (flight) => String(flight.flightId) === String(selectedFlightId)
-      )
-    ) {
+      );
+      if (!isCurrentFlightValid) {
+        setSelectedFlightId(String(flightsForSelectedDate[0].flightId));
+      }
+    } else {
       setSelectedFlightId('');
     }
-  }, [selectedDate, selectedFlightId, flightsForSelectedDate]);
+  }, [selectedDate, flightsForSelectedDate, selectedFlightId]);
+
+  useEffect(() => {
+    if (!selectedFlightId) {
+      setBookedSeatsForFlight([]);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingBookedSeats(true);
+
+    flightApi
+      .getBookedSeats(selectedFlightId)
+      .then((res) => {
+        if (isMounted) {
+          const booked = Array.isArray(res.data)
+            ? res.data.map((s) => String(s).trim().toUpperCase())
+            : [];
+          setBookedSeatsForFlight(booked);
+          setRescheduleSeat((currentSeat) => {
+            if (currentSeat && booked.includes(currentSeat.toUpperCase())) {
+              return '';
+            }
+            return currentSeat;
+          });
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load booked seats for flight', err);
+        if (isMounted) setBookedSeatsForFlight([]);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingBookedSeats(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedFlightId]);
+
+  const allFlightSeats = useMemo(() => {
+    if (!selectedFlightId) return BASE_FLIGHT_SEATS;
+    const flightObj = flightOptions.find(
+      (f) => String(f.flightId) === String(selectedFlightId)
+    );
+    return getFlightSeats(flightObj?.totalSeats || 20);
+  }, [selectedFlightId, flightOptions]);
+
+  const availableSeatsOnly = useMemo(() => {
+    if (!selectedFlightId) return [];
+    const flightObj = flightOptions.find(
+      (f) => String(f.flightId) === String(selectedFlightId)
+    );
+    const allSeats = getFlightSeats(flightObj?.totalSeats || 20);
+    const bookedSet = new Set(bookedSeatsForFlight.map((s) => s.toUpperCase()));
+    // Display ONLY the seats that are available and have not yet been booked
+    return allSeats.filter((seat) => !bookedSet.has(seat.toUpperCase()));
+  }, [selectedFlightId, flightOptions, bookedSeatsForFlight]);
 
   // Confirm reschedule and show success alert
   const submitReschedule = async () => {
@@ -255,7 +384,14 @@ export default function MyBookings() {
     }
 
     if (!rescheduleSeat.trim()) {
-      setRescheduleError('Please enter a seat number.');
+      setRescheduleError('Please select an available seat number.');
+      return;
+    }
+
+    if (bookedSeatsForFlight.includes(rescheduleSeat.trim().toUpperCase())) {
+      setRescheduleError(
+        `Seat ${rescheduleSeat.trim().toUpperCase()} is already booked. Please choose an available seat.`
+      );
       return;
     }
 
@@ -723,6 +859,7 @@ export default function MyBookings() {
                     </div>
                     <div style={{ fontSize: '0.78rem', color: '#e0f2fe' }}>
                       Flight {rescheduleTarget.flightNumber} · {rescheduleTarget.class || 'Economy'} Class
+                      {rescheduleTarget.availableSeats != null ? ` · ${rescheduleTarget.availableSeats} available seats` : ''}
                     </div>
                   </div>
                 </div>
@@ -913,6 +1050,16 @@ export default function MyBookings() {
                   <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
                     {rescheduleTarget.passengerCount || 1} traveller(s)
                   </div>
+                  {rescheduleTarget.availableSeats != null && (
+                    <div style={{
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      marginTop: '3px',
+                      color: Number(rescheduleTarget.availableSeats) > 5 ? '#059669' : (Number(rescheduleTarget.availableSeats) > 0 ? '#d97706' : '#dc2626')
+                    }}>
+                      {rescheduleTarget.availableSeats} available seat{Number(rescheduleTarget.availableSeats) === 1 ? '' : 's'}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1229,8 +1376,10 @@ export default function MyBookings() {
               )}
             </div>
 
-            {/* Seat Number */}
-            <div style={{ marginTop: '18px' }}>
+
+
+            {/* Selected Seat input */}
+            <div style={{ marginTop: '16px' }}>
               <label
                 htmlFor="reschedule-seat"
                 style={{
@@ -1241,56 +1390,330 @@ export default function MyBookings() {
                   marginBottom: '8px',
                 }}
               >
-                Seat number
+                Selected Seat Number *
               </label>
 
               <input
                 id="reschedule-seat"
                 type="text"
                 value={rescheduleSeat}
-                onChange={(event) =>
-                  setRescheduleSeat(event.target.value.toUpperCase())
-                }
-                placeholder="e.g. 12A"
+                onChange={(event) => {
+                  setRescheduleSeat(event.target.value.toUpperCase());
+                  setRescheduleError('');
+                }}
+                placeholder="Click a seat below or enter seat e.g. 11B"
                 autoComplete="off"
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
                   padding: '11px 12px',
                   borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
+                  border:
+                    rescheduleSeat && bookedSeatsForFlight.includes(rescheduleSeat.toUpperCase())
+                      ? '1.5px solid #dc2626'
+                      : '1px solid #cbd5e1',
                   fontSize: '0.9rem',
                   fontFamily: 'var(--font-mono)',
                   textTransform: 'uppercase',
                 }}
               />
 
-              <p
-                style={{
-                  fontSize: '0.76rem',
-                  color: '#64748b',
-                  marginTop: '7px',
-                  marginBottom: 0,
-                }}
-              >
-                The fare stays the same because the route is unchanged. Seat
-                availability will be validated when you confirm.
-              </p>
+              {rescheduleSeat && bookedSeatsForFlight.includes(rescheduleSeat.toUpperCase()) ? (
+                <p
+                  style={{
+                    fontSize: '0.78rem',
+                    color: '#dc2626',
+                    marginTop: '6px',
+                    fontWeight: 600,
+                    marginBottom: 0,
+                  }}
+                >
+                  Seat {rescheduleSeat} is already booked on this flight. Please choose an available seat from the seat map below.
+                </p>
+              ) : (
+                <p
+                  style={{
+                    fontSize: '0.76rem',
+                    color: '#64748b',
+                    marginTop: '7px',
+                    marginBottom: 0,
+                  }}
+                >
+                  The fare stays the same because the route is unchanged. Only unbooked seats can be selected.
+                </p>
+              )}
             </div>
 
-            <div style={{ marginTop: '18px' }}>
-              <label
-                htmlFor="reschedule-seat"
+            {/* Select a Seat Map (Matching Image 3) */}
+            <div style={{ marginTop: '20px' }}>
+              <div
                 style={{
-                  display: 'block',
-                  fontSize: '0.86rem',
-                  fontWeight: 800,
-                  color: '#334155',
-                  marginBottom: '8px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '14px',
+                  flexWrap: 'wrap',
+                  gap: '12px',
                 }}
               >
-                Available Seat
-              </label>
+                <h4
+                  style={{
+                    margin: 0,
+                    fontSize: '0.98rem',
+                    fontWeight: 700,
+                    color: '#334155',
+                  }}
+                >
+                  Select a Seat
+                </h4>
+
+                {/* Legend: Available, Selected, Booked */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    fontSize: '0.84rem',
+                    color: '#64748b',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        width: '13px',
+                        height: '13px',
+                        borderRadius: '3px',
+                        border: '1.5px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        display: 'inline-block',
+                      }}
+                    />
+                    <span>Available</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        width: '13px',
+                        height: '13px',
+                        borderRadius: '3px',
+                        backgroundColor: '#0284c7',
+                        display: 'inline-block',
+                      }}
+                    />
+                    <span>Selected</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        width: '13px',
+                        height: '13px',
+                        borderRadius: '3px',
+                        border: '1.5px solid #f87171',
+                        backgroundColor: '#fee2e2',
+                        display: 'inline-block',
+                      }}
+                    />
+                    <span style={{ color: '#dc2626', fontWeight: 700 }}>Booked</span>
+                  </div>
+                </div>
+              </div>
+
+              {!selectedFlightId ? (
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: '0.84rem',
+                    color: '#64748b',
+                    backgroundColor: '#f8fafc',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: '1px dashed #cbd5e1',
+                  }}
+                >
+                  Please select an available flight above to view seats.
+                </p>
+              ) : loadingBookedSeats ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    color: '#64748b',
+                    fontSize: '0.85rem',
+                    padding: '14px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  <RefreshCw size={15} className="animate-spin" />
+                  Loading seat availability for this flight...
+                </div>
+              ) : (
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '14px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    overflowX: 'auto',
+                  }}
+                >
+                  {/* Row 1: 11A - 16C (11 seats) */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                    {allFlightSeats.slice(0, 11).map((seat) => {
+                      const isBooked = bookedSeatsForFlight.includes(seat.toUpperCase());
+                      const isSelected = rescheduleSeat.trim().toUpperCase() === seat.toUpperCase();
+
+                      return (
+                        <button
+                          key={seat}
+                          type="button"
+                          disabled={isBooked}
+                          title={
+                            isBooked
+                              ? `Seat ${seat} is already booked`
+                              : isSelected
+                              ? `Seat ${seat} is selected`
+                              : `Seat ${seat} is available`
+                          }
+                          onClick={() => {
+                            if (!isBooked) {
+                              setRescheduleSeat(seat);
+                              setRescheduleError('');
+                            }
+                          }}
+                          style={{
+                            minWidth: '48px',
+                            height: '40px',
+                            borderRadius: '10px',
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            fontFamily: 'var(--font-mono)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '0 8px',
+                            transition: 'all 0.15s ease',
+                            cursor: isBooked ? 'not-allowed' : 'pointer',
+                            backgroundColor: isBooked
+                              ? '#fee2e2'
+                              : isSelected
+                              ? '#0284c7'
+                              : '#ffffff',
+                            border: isBooked
+                              ? '1.5px solid #f87171'
+                              : isSelected
+                              ? '1.5px solid #0284c7'
+                              : '1.5px solid #cbd5e1',
+                            color: isBooked
+                              ? '#dc2626'
+                              : isSelected
+                              ? '#ffffff'
+                              : '#1e293b',
+                            textDecoration: isBooked ? 'line-through' : 'none',
+                            boxShadow: isSelected ? '0 2px 8px rgba(2, 132, 199, 0.35)' : 'none',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isBooked && !isSelected) {
+                              e.currentTarget.style.borderColor = '#0284c7';
+                              e.currentTarget.style.backgroundColor = '#f0f9ff';
+                              e.currentTarget.style.color = '#0284c7';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isBooked && !isSelected) {
+                              e.currentTarget.style.borderColor = '#cbd5e1';
+                              e.currentTarget.style.backgroundColor = '#ffffff';
+                              e.currentTarget.style.color = '#1e293b';
+                            }
+                          }}
+                        >
+                          {seat}
+                        </button>
+                      );
+                    })}
+
+                    {allFlightSeats.slice(11).map((seat) => {
+                      const isBooked = bookedSeatsForFlight.includes(seat.toUpperCase());
+                      const isSelected = rescheduleSeat.trim().toUpperCase() === seat.toUpperCase();
+
+                      return (
+                        <button
+                          key={seat}
+                          type="button"
+                          disabled={isBooked}
+                          title={
+                            isBooked
+                              ? `Seat ${seat} is already booked`
+                              : isSelected
+                              ? `Seat ${seat} is selected`
+                              : `Seat ${seat} is available`
+                          }
+                          onClick={() => {
+                            if (!isBooked) {
+                              setRescheduleSeat(seat);
+                              setRescheduleError('');
+                            }
+                          }}
+                          style={{
+                            minWidth: '48px',
+                            height: '40px',
+                            borderRadius: '10px',
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            fontFamily: 'var(--font-mono)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '0 8px',
+                            transition: 'all 0.15s ease',
+                            cursor: isBooked ? 'not-allowed' : 'pointer',
+                            backgroundColor: isBooked
+                              ? '#fee2e2'
+                              : isSelected
+                              ? '#0284c7'
+                              : '#ffffff',
+                            border: isBooked
+                              ? '1.5px solid #f87171'
+                              : isSelected
+                              ? '1.5px solid #0284c7'
+                              : '1.5px solid #cbd5e1',
+                            color: isBooked
+                              ? '#dc2626'
+                              : isSelected
+                              ? '#ffffff'
+                              : '#1e293b',
+                            textDecoration: isBooked ? 'line-through' : 'none',
+                            boxShadow: isSelected ? '0 2px 8px rgba(2, 132, 199, 0.35)' : 'none',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isBooked && !isSelected) {
+                              e.currentTarget.style.borderColor = '#0284c7';
+                              e.currentTarget.style.backgroundColor = '#f0f9ff';
+                              e.currentTarget.style.color = '#0284c7';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isBooked && !isSelected) {
+                              e.currentTarget.style.borderColor = '#cbd5e1';
+                              e.currentTarget.style.backgroundColor = '#ffffff';
+                              e.currentTarget.style.color = '#1e293b';
+                            }
+                          }}
+                        >
+                          {seat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Dialog Actions */}

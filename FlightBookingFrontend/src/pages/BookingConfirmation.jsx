@@ -39,6 +39,26 @@ export default function BookingConfirmation() {
 
   const booking = currentBooking;
 
+  const allPassengers = React.useMemo(() => {
+    if (Array.isArray(booking?.passengers) && booking.passengers.length > 0) {
+      return booking.passengers;
+    }
+    if (typeof booking?.passengerDetails === 'string' && booking.passengerDetails.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(booking.passengerDetails);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    return [{
+      name: booking?.passengerName || '',
+      email: booking?.passengerEmail || '',
+      phone: booking?.passengerPhone || '',
+      age: booking?.passengerAge,
+      gender: booking?.passengerGender,
+      seat: booking?.seatNumber || ''
+    }];
+  }, [booking]);
+
   useEffect(() => {
     // Launch celebratory confetti effect on mount if booking is confirmed
     if (booking?.bookingStatus?.toLowerCase() !== 'cancelled') {
@@ -283,7 +303,16 @@ export default function BookingConfirmation() {
             <div>
               <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 600 }}>Passenger</div>
               <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', marginTop: '3px' }}>{booking.passengerName}</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Age: {booking.passengerAge} • {booking.passengerGender}</div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                Age: {booking.passengerAge} • {booking.passengerGender}
+                {(booking.passengerDob || booking.dateOfBirth) ? ` • DOB: ${booking.passengerDob || booking.dateOfBirth}` : ''}
+              </div>
+              {booking.passengerPhone && (
+                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>{booking.passengerPhone}</div>
+              )}
+              {booking.passengerEmail && (
+                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '1px' }}>{booking.passengerEmail}</div>
+              )}
             </div>
 
             <div>
@@ -314,6 +343,44 @@ export default function BookingConfirmation() {
               <div style={{ fontSize: '0.75rem', color: booking.bookingStatus?.toLowerCase() === 'cancelled' ? '#dc2626' : '#059669', marginTop: '3px' }}>Payment: {booking.paymentStatus}</div>
             </div>
           </div>
+
+          {/* Detailed All Passengers List */}
+          {allPassengers.length > 0 && (
+            <div style={{ padding: '20px 0', borderBottom: '1px dashed #cbd5e1' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.04em' }}>
+                All Passenger Details ({allPassengers.length})
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                {allPassengers.map((p, idx) => (
+                  <div key={idx} style={{ padding: '12px 14px', borderRadius: '12px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>
+                        {p.title ? `${p.title}. ` : ''}{p.name || `${p.firstName || ''} ${p.lastName || ''}`.trim()}
+                      </strong>
+                      {p.seat && (
+                        <span style={{ padding: '2px 8px', borderRadius: '6px', backgroundColor: '#0284c7', color: '#ffffff', fontFamily: 'var(--font-mono)', fontSize: '0.76rem', fontWeight: 700 }}>
+                          {p.seat}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
+                      {p.age ? `Age: ${p.age}` : ''}{p.gender ? ` • ${p.gender}` : ''}{p.dob ? ` • DOB: ${p.dob}` : ''}
+                    </div>
+                    {p.email && (
+                      <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px', wordBreak: 'break-all' }}>
+                        ✉ {p.email}
+                      </div>
+                    )}
+                    {p.phone && (
+                      <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+                        📞 {p.phone}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Financial Breakdown & Barcode stub */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '24px', flexWrap: 'wrap', gap: '20px' }}>

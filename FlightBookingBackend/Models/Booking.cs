@@ -34,6 +34,9 @@ namespace FlightBookingBackend.Models
         [MaxLength(50)]
         public string PassengerPhone { get; set; } = string.Empty;
 
+        [Column(TypeName = "date")]
+        public DateOnly? PassengerDob { get; set; }
+
         public int PassengerAge { get; set; }
 
         [Required]
@@ -49,6 +52,8 @@ namespace FlightBookingBackend.Models
         public string Class { get; set; } = "Economy";
 
         public int PassengerCount { get; set; } = 1;
+
+        public string? PassengerDetails { get; set; }
 
         public DateTime BookingDate { get; set; } = DateTime.UtcNow;
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, XCircle, Download, FileText, CalendarClock, Edit3, X } from 'lucide-react';
+import { Eye, XCircle, Download, FileText, CalendarClock, Edit3, X, Armchair } from 'lucide-react';
 import { formatINR } from '../utils/flightPricing';
 
 const STATUS_BADGES = {
@@ -68,7 +68,7 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Route</th>
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Departure</th>
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Passenger</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Seat & Class</th>
+              <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Seat & Class</th>              
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Amount</th>
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Status</th>
               <th style={{ padding: '14px 18px', fontWeight: 700, color: '#475569' }}>Actions</th>
@@ -124,6 +124,8 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                   }}>{b.seatNumber}</span>
                   <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{b.class}</div>
                 </td>
+
+
 
                 {/* Amount */}
                 <td style={{ padding: '16px 18px', fontWeight: 700, color: '#0f172a' }}>
@@ -262,6 +264,7 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                 </p>
                 <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                   Route: {editTarget.fromCity} → {editTarget.toCity} ({editTarget.departureDate})
+                  {editTarget.availableSeats != null ? ` · ${editTarget.availableSeats} seats available` : ''}
                 </p>
               </div>
               <button

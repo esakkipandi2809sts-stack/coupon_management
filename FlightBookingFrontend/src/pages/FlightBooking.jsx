@@ -9,12 +9,23 @@ import { bookingApi, couponApi, flightApi } from '../services/api';
 import { authUtil } from '../utils/auth';
 import { calculateClassFare, formatINR } from '../utils/flightPricing';
 
-const EMPTY_PASSENGER = { name: '', email: '', phone: '', age: '', gender: '', seat: '' };
+const EMPTY_PASSENGER = {
+  title: 'Mr',
+  firstName: '',
+  lastName: '',
+  name: '',
+  email: '',
+  dob: '',
+  phone: '',
+  age: '',
+  gender: 'Male',
+  seat: ''
+};
 
 const SAMPLE_SEATS = [
   '11A', '11B', '12A', '12B', '13A', '13B', '14A', '14B',
-  '15A', '15B', '16C', '16D', '17C', '17D', '18C', '18D',
-  '19C', '19D', '20C', '20D'
+  '15A', '15B', '16A', '16B', '17A', '17B', '18A', '18B',
+  '19A', '19B', '20A', '20B',
 ];
 
 const PAYMENT_METHODS = ['Credit Card', 'Debit Card', 'UPI / NetBanking'];
@@ -78,12 +89,22 @@ export default function FlightBooking() {
   const passengerCount = Math.min(27, Math.max(1, Number(location.state?.passengerCount) || 1));
   const initialCouponCode = location.state?.couponCode || '';
 
-  const [passengers, setPassengers] = useState(() => [{
-    ...EMPTY_PASSENGER,
-    name: user?.fullName || '',
-    email: user?.email || '',
-    phone: user?.phoneNumber || ''
-  }]);
+  const [passengers, setPassengers] = useState(() => {
+    const defaultName = (user?.fullName || '').trim();
+    const parts = defaultName.split(' ');
+    const first = parts[0] || '';
+    const last = parts.slice(1).join(' ') || '';
+
+    return [{
+      ...EMPTY_PASSENGER,
+      title: 'Mr',
+      firstName: first,
+      lastName: last,
+      name: defaultName,
+      email: user?.email || '',
+      phone: user?.phoneNumber || ''
+    }];
+  });
 
   const [paymentMethod, setPaymentMethod] = useState('Credit Card');
   const [couponCode, setCouponCode] = useState(initialCouponCode);
@@ -185,7 +206,17 @@ export default function FlightBooking() {
   }, []);
 
   const updatePassenger = (index, field, value) => {
-    setPassengers(previous => previous.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
+    setPassengers(previous =>
+      previous.map((p, i) => {
+        if (i !== index) return p;
+        const updated = { ...p, [field]: value };
+        const first = field === 'firstName' ? value : (updated.firstName || '');
+        const last = field === 'lastName' ? value : (updated.lastName || '');
+        const combined = [first, last].filter(Boolean).join(' ').trim();
+        updated.name = combined || updated.name || '';
+        return updated;
+      })
+    );
 
     setFormErrors(previous => {
       const next = { ...previous };
@@ -227,13 +258,21 @@ export default function FlightBooking() {
     passengers.forEach((passenger, index) => {
       const err = {};
 
-      if (!passenger.name.trim()) err.name = 'Passenger name is required.';
+      const fullName = (passenger.name || `${passenger.firstName || ''} ${passenger.lastName || ''}`).trim();
+      if (!passenger.firstName?.trim() && !fullName) {
+        err.firstName = 'First name is required.';
+      }
 
-      if (!passenger.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passenger.email.trim())) {
+      if (!passenger.lastName?.trim() && !fullName) {
+        err.lastName = 'Last name is required.';
+      }
+
+      const email = (passenger.email || user?.email || '').trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         err.email = 'Enter a valid email address.';
       }
 
-      if (!passenger.phone.trim()) {
+      if (!passenger.phone?.trim()) {
         err.phone = 'Phone number is required.';
       } else if (passenger.phone.replace(/\D/g, '').length < 7) {
         err.phone = 'Enter a valid phone number.';
@@ -252,7 +291,7 @@ export default function FlightBooking() {
           err.seat = `Seat ${seat} has already been booked. Please choose another seat.`;
         } else {
           const duplicateSeat = passengers.some((other, otherIndex) =>
-            otherIndex !== index && other.seat.trim().toUpperCase() === seat
+            otherIndex !== index && other.seat?.trim().toUpperCase() === seat
           );
           if (duplicateSeat) err.seat = 'This seat is selected by another passenger.';
         }
@@ -469,16 +508,20 @@ export default function FlightBooking() {
 
     try {
       const firstPassenger = passengers[0];
+      const primaryFullName = (firstPassenger.name || `${firstPassenger.firstName || ''} ${firstPassenger.lastName || ''}`).trim();
+      const primaryEmail = (firstPassenger.email || user?.email || '').trim();
 
       const payload = {
         idempotencyKey: bookingRequestKeyRef.current,
         flightId: flight.flightId,
-        passengerName: firstPassenger.name.trim(),
-        passengerEmail: firstPassenger.email.trim(),
-        passengerPhone: firstPassenger.phone.trim(),
+        passengerName: primaryFullName,
+        passengerEmail: primaryEmail,
+        passengerPhone: (firstPassenger.phone || '').trim(),
+        passengerDob: firstPassenger.dob || '',
+        dateOfBirth: firstPassenger.dob || '',
         passengerAge: Number(firstPassenger.age),
-        passengerGender: firstPassenger.gender,
-        seatNumber: firstPassenger.seat.trim().toUpperCase(),
+        passengerGender: firstPassenger.gender || 'Male',
+        seatNumber: (firstPassenger.seat || '').trim().toUpperCase(),
         class: selectedClass,
         passengerCount,
         paymentMethod,
@@ -490,14 +533,21 @@ export default function FlightBooking() {
         redeemCouponPoints: false,
         couponPointsToRedeem: 0,
 
-        passengers: passengers.map(passenger => ({
-          name: passenger.name.trim(),
-          email: passenger.email.trim(),
-          phone: passenger.phone.trim(),
-          age: Number(passenger.age),
-          gender: passenger.gender,
-          seat: passenger.seat.trim().toUpperCase()
-        }))
+        passengers: passengers.map(passenger => {
+          const fullName = (passenger.name || `${passenger.firstName || ''} ${passenger.lastName || ''}`).trim();
+          return {
+            title: passenger.title || 'Mr',
+            firstName: (passenger.firstName || '').trim(),
+            lastName: (passenger.lastName || '').trim(),
+            name: fullName,
+            email: (passenger.email || primaryEmail).trim(),
+            phone: (passenger.phone || firstPassenger.phone || '').trim(),
+            dob: passenger.dob || '',
+            age: Number(passenger.age),
+            gender: passenger.gender || 'Male',
+            seat: (passenger.seat || '').trim().toUpperCase()
+          };
+        })
       };
 
       const response = await bookingApi.create(payload);
@@ -579,11 +629,6 @@ export default function FlightBooking() {
           gap: 24px;
           align-items: start;
         }
-        .booking-two-fields {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
-        }
         .booking-three-fields {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -633,9 +678,6 @@ export default function FlightBooking() {
         .booking-seat:disabled { cursor: not-allowed; }
         @media (max-width: 990px) {
           .booking-grid { grid-template-columns: minmax(0, 1fr); }
-        }
-        @media (max-width: 600px) {
-          .booking-two-fields, .booking-three-fields { grid-template-columns: minmax(0, 1fr); }
         }
       `}</style>
 
@@ -734,37 +776,43 @@ export default function FlightBooking() {
                       )}
                     </div>
 
-                    <div style={{ marginBottom: 14 }}>
+                    <div style={{ marginBottom: 14 }} className="booking-three-fields">
                       <FormField
-                        label="Full Name *"
-                        value={passenger.name}
-                        placeholder="Enter passenger name"
-                        error={errors.name}
-                        onChange={e => updatePassenger(index, 'name', e.target.value)}
+                        label="Title *"
+                        value={passenger.title}
+                        placeholder="Enter passenger title"
+                        error={errors.title}
+                        onChange={e => updatePassenger(index, 'title', e.target.value)}
+                      />
+
+                      <FormField
+                        label="First Name *"
+                        value={passenger.firstName}
+                        placeholder="Enter First name"
+                        error={errors.firstName}
+                        onChange={e => updatePassenger(index, 'firstName', e.target.value)}
+                      />
+
+                      <FormField
+                        label="Last Name *"
+                        value={passenger.lastName}
+                        placeholder="Enter Last name"
+                        error={errors.lastName}
+                        onChange={e => updatePassenger(index, 'lastName', e.target.value)}
                       />
                     </div>
 
-                    <div className="booking-two-fields" style={{ marginBottom: 14 }}>
+                    <div className="booking-three-fields" style={{ marginBottom: 14 }}>
                       <FormField
-                        label="Email Address *"
-                        type="email"
-                        value={passenger.email}
-                        placeholder="Enter email"
-                        error={errors.email}
-                        onChange={e => updatePassenger(index, 'email', e.target.value)}
+                        label="Date of Birth *"
+                        type="date"
+                        placeholder="Enter Date of Birth"
+                        value={passenger.dob}
+                        error={errors.dob}
+                        max={new Date().toISOString().split('T')[0]}
+                        onChange={e => updatePassenger(index, 'dob', e.target.value)}
                       />
 
-                      <FormField
-                        label="Phone Number *"
-                        type="tel"
-                        value={passenger.phone}
-                        placeholder="+91 98765 43210"
-                        error={errors.phone}
-                        onChange={e => updatePassenger(index, 'phone', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="booking-three-fields">
                       <FormField
                         label="Age *"
                         type="number"
@@ -782,6 +830,26 @@ export default function FlightBooking() {
                         options={['Male', 'Female', 'Other']}
                         error={errors.gender}
                         onChange={e => updatePassenger(index, 'gender', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="booking-three-fields" style={{ marginBottom: 14 }}>
+                      <FormField
+                        label="Email Address *"
+                        type="email"
+                        value={passenger.email}
+                        placeholder="passenger@example.com"
+                        error={errors.email}
+                        onChange={e => updatePassenger(index, 'email', e.target.value)}
+                      />
+
+                      <FormField
+                        label="Phone Number *"
+                        type="tel"
+                        value={passenger.phone}
+                        placeholder="+91 98765 43210"
+                        error={errors.phone}
+                        onChange={e => updatePassenger(index, 'phone', e.target.value)}
                       />
 
                       <FormField
@@ -1159,10 +1227,10 @@ export default function FlightBooking() {
                         if (!couponCode) return true;
                         return code.includes(couponCode.toUpperCase());
                       }).length === 0 && (
-                        <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
-                          No matching available coupon
-                        </div>
-                      )}
+                          <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
+                            No matching available coupon
+                          </div>
+                        )}
                     </div>
                   )}
                 </div>
@@ -1248,7 +1316,7 @@ export default function FlightBooking() {
               <label style={styles.label}>Points to Convert into Coupon</label>
 
               <input
-                type="number"                
+                type="number"
                 max={availableCouponPoints}
                 step="1"
                 value={pointsToRedeem}

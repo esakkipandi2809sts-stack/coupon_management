@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FlightBookingBackend.Data;
 using FlightBookingBackend.DTOs;
 using FlightBookingBackend.Models;
@@ -111,16 +112,33 @@ namespace FlightBookingBackend.Services
             {
                 await _context.Entry(flight).ReloadAsync();
 
-                var normalizedSeatNumber = dto.SeatNumber.Trim().ToUpperInvariant();
-                var seatAlreadyBooked = await _context.Bookings.AnyAsync(booking =>
-                    booking.FlightId == flight.FlightId &&
-                    booking.SeatNumber == normalizedSeatNumber &&
-                    booking.BookingStatus != BookingStatuses.Cancelled &&
-                    booking.BookingStatus != BookingStatuses.Failed);
-                if (seatAlreadyBooked)
+                var seatsToValidate = new List<string>();
+                if (dto.Passengers != null && dto.Passengers.Count > 0)
                 {
-                    await transaction.RollbackAsync();
-                    return (false, "This seat has already been booked for the selected flight.", null);
+                    seatsToValidate.AddRange(
+                        dto.Passengers
+                            .Where(p => !string.IsNullOrWhiteSpace(p.Seat))
+                            .Select(p => p.Seat!.Trim().ToUpperInvariant())
+                    );
+                }
+
+                if (seatsToValidate.Count == 0 && !string.IsNullOrWhiteSpace(dto.SeatNumber))
+                {
+                    seatsToValidate.Add(dto.SeatNumber.Trim().ToUpperInvariant());
+                }
+
+                foreach (var seatNum in seatsToValidate)
+                {
+                    var seatAlreadyBooked = await _context.Bookings.AnyAsync(booking =>
+                        booking.FlightId == flight.FlightId &&
+                        booking.SeatNumber == seatNum &&
+                        booking.BookingStatus != BookingStatuses.Cancelled &&
+                        booking.BookingStatus != BookingStatuses.Failed);
+                    if (seatAlreadyBooked)
+                    {
+                        await transaction.RollbackAsync();
+                        return (false, $"Seat {seatNum} has already been booked for the selected flight.", null);
+                    }
                 }
 
                 if (flight.AvailableSeats < dto.PassengerCount)
@@ -146,6 +164,40 @@ namespace FlightBookingBackend.Services
                 int pointsEarned = finalAmount <= 0 ? 0 : AirlineClassCouponCalculator.CalculatePoints(finalAmount, percentage);
                 int generatedCouponAmount = AirlineClassCouponCalculator.CalculateDiscount(pointsEarned);
 
+                // Prepare full passenger details list
+                var passengersList = dto.Passengers != null && dto.Passengers.Count > 0
+                    ? dto.Passengers
+                    : new List<PassengerDto>
+                    {
+                        new PassengerDto
+                        {
+                            Name = dto.PassengerName.Trim(),
+                            Email = dto.PassengerEmail.Trim(),
+                            Phone = dto.PassengerPhone.Trim(),
+                            Age = dto.PassengerAge,
+                            Gender = dto.PassengerGender,
+                            Seat = dto.SeatNumber.Trim().ToUpper()
+                        }
+                    };
+
+                var serializedPassengers = JsonSerializer.Serialize(passengersList);
+
+                var primaryPassenger = passengersList[0];
+                var primaryName = !string.IsNullOrWhiteSpace(primaryPassenger.Name) ? primaryPassenger.Name.Trim() : dto.PassengerName.Trim();
+                var primaryEmail = !string.IsNullOrWhiteSpace(primaryPassenger.Email) ? primaryPassenger.Email.Trim() : dto.PassengerEmail.Trim();
+                var primaryPhone = !string.IsNullOrWhiteSpace(primaryPassenger.Phone) ? primaryPassenger.Phone.Trim() : dto.PassengerPhone.Trim();
+                var primaryAge = primaryPassenger.Age > 0 ? primaryPassenger.Age : dto.PassengerAge;
+                var primaryGender = !string.IsNullOrWhiteSpace(primaryPassenger.Gender) ? primaryPassenger.Gender.Trim() : dto.PassengerGender.Trim();
+                var primarySeat = !string.IsNullOrWhiteSpace(primaryPassenger.Seat) ? primaryPassenger.Seat.Trim().ToUpper() : dto.SeatNumber.Trim().ToUpper();
+                DateOnly? parsedDob = null;
+                var rawDob = !string.IsNullOrWhiteSpace(dto.PassengerDob)
+                    ? dto.PassengerDob
+                    : (!string.IsNullOrWhiteSpace(dto.DateOfBirth) ? dto.DateOfBirth : primaryPassenger.Dob);
+                if (!string.IsNullOrWhiteSpace(rawDob) && DateOnly.TryParse(rawDob, out var d))
+                {
+                    parsedDob = d;
+                }
+
                 // Create Booking
                 var booking = new Booking
                 {
@@ -153,14 +205,16 @@ namespace FlightBookingBackend.Services
                     IdempotencyKey = dto.IdempotencyKey,
                     UserId = userId,
                     FlightId = flight.FlightId,
-                    PassengerName = dto.PassengerName.Trim(),
-                    PassengerEmail = dto.PassengerEmail.Trim(),
-                    PassengerPhone = dto.PassengerPhone.Trim(),
-                    PassengerAge = dto.PassengerAge,
-                    PassengerGender = dto.PassengerGender,
-                    SeatNumber = dto.SeatNumber.Trim().ToUpper(),
+                    PassengerName = primaryName,
+                    PassengerEmail = primaryEmail,
+                    PassengerPhone = primaryPhone,
+                    PassengerDob = parsedDob,
+                    PassengerAge = primaryAge,
+                    PassengerGender = primaryGender,
+                    SeatNumber = primarySeat,
                     Class = dto.Class,
                     PassengerCount = dto.PassengerCount,
+                    PassengerDetails = serializedPassengers,
                     BookingDate = DateTime.UtcNow,
                     FlightJourneyDate = flight.DepartureDate,
                     DistanceKm = distanceKm,
@@ -750,11 +804,15 @@ namespace FlightBookingBackend.Services
                 PassengerName = b.PassengerName,
                 PassengerEmail = b.PassengerEmail,
                 PassengerPhone = b.PassengerPhone,
+                PassengerDob = b.PassengerDob,
+                DateOfBirth = b.PassengerDob?.ToString("yyyy-MM-dd"),
                 PassengerAge = b.PassengerAge,
                 PassengerGender = b.PassengerGender,
                 SeatNumber = b.SeatNumber,
                 Class = b.Class,
                 PassengerCount = b.PassengerCount < 1 ? 1 : b.PassengerCount,
+                PassengerDetails = b.PassengerDetails,
+                Passengers = DeserializePassengers(b.PassengerDetails),
                 BookingDate = b.BookingDate,
                 FlightJourneyDate = b.FlightJourneyDate ?? b.Flight?.DepartureDate,
                 DistanceKm = distanceKm,
@@ -783,6 +841,8 @@ namespace FlightBookingBackend.Services
                 ArrivalDate = b.Flight?.ArrivalDate ?? DateOnly.MinValue,
                 ArrivalTime = b.Flight?.ArrivalTime ?? "N/A",
                 Duration = b.Flight?.Duration ?? "N/A",
+                AvailableSeats = b.Flight?.AvailableSeats ?? 0,
+                TotalSeats = b.Flight?.TotalSeats ?? 0,
                 AppliedCouponCode = couponUsage?.Coupon?.CouponCode,
                 AppliedCouponPercentage = couponUsage?.Coupon?.DiscountPercentage,
                 AppliedCouponPoints = couponUsage?.Coupon?.CouponPoints,
@@ -794,6 +854,22 @@ namespace FlightBookingBackend.Services
                 GeneratedCouponPercentage = b.GeneratedCoupon?.DiscountPercentage,
                 GeneratedCouponAvailableFromDate = b.GeneratedCoupon?.AvailableFromDate
             };
+        }
+
+        private static List<PassengerDto>? DeserializePassengers(string? passengerDetails)
+        {
+            if (string.IsNullOrWhiteSpace(passengerDetails)) return null;
+            try
+            {
+                return JsonSerializer.Deserialize<List<PassengerDto>>(
+                    passengerDetails,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }
