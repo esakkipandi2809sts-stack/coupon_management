@@ -9,6 +9,7 @@ namespace FlightBookingBackend.Services
         Task<IEnumerable<FlightDto>> GetFlightsByRouteAsync(string fromCity, string toCity);
         Task<IEnumerable<FlightDto>> SearchFlightsByRouteAsync(string from, string to, DateOnly date);
         Task<FlightDto?> GetFlightByIdAsync(int flightId);
+        Task<List<string>> GetBookedSeatsAsync(int flightId);
         Task<bool> DeleteFlightAsync(int flightId);
         Task<IEnumerable<string>> GetUniqueCitiesAsync();
         Task<FlightSearchOptionsDto> GetSearchOptionsAsync();

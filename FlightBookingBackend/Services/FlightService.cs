@@ -145,7 +145,24 @@ namespace FlightBookingBackend.Services
                 .AsNoTracking()
                 .FirstOrDefaultAsync(f => f.FlightId == flightId);
 
-            return flight == null ? null : MapToDto(flight);
+            if (flight == null) return null;
+
+            var dto = MapToDto(flight);
+            dto.BookedSeats = await GetBookedSeatsAsync(flightId);
+            return dto;
+        }
+
+        public async Task<List<string>> GetBookedSeatsAsync(int flightId)
+        {
+            return await _context.Bookings
+                .AsNoTracking()
+                .Where(b => b.FlightId == flightId &&
+                            b.BookingStatus != BookingStatuses.Cancelled &&
+                            b.BookingStatus != BookingStatuses.Failed &&
+                            !string.IsNullOrWhiteSpace(b.SeatNumber))
+                .Select(b => b.SeatNumber.Trim().ToUpper())
+                .Distinct()
+                .ToListAsync();
         }
 
         public async Task<bool> DeleteFlightAsync(int flightId)

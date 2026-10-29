@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { bookingApi, flightApi } from '../services/api';
 import BookingTable from '../components/BookingTable';
+import { formatINR } from '../utils/flightPricing';
 
 const STATUS_FILTERS = [
   'All',
@@ -36,6 +37,17 @@ const todayIso = () => {
 };
 
 const dateOnly = (value) => String(value ?? '').slice(0, 10);
+
+const formatDisplayDate = (dateVal) => {
+  if (!dateVal) return '—';
+  const d = new Date(dateVal);
+  if (Number.isNaN(d.getTime())) return String(dateVal);
+  return d.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
 
 export default function MyBookings() {
   const navigate = useNavigate();
@@ -121,6 +133,24 @@ export default function MyBookings() {
     }
   };
 
+  const handleRescheduleDirect = async (bookingId) => {
+    setMessage('');
+    setErrorMessage('');
+
+    try {
+      const res = await bookingApi.rescheduleDirect(bookingId);
+      setMessage(res.data?.message || 'Booking status updated to Rescheduled successfully.');
+      window.setTimeout(() => setMessage(''), 4000);
+
+      await fetchBookings();
+    } catch (err) {
+      const msg =
+        err.response?.data?.message || 'Failed to update booking status to Rescheduled.';
+      setErrorMessage(msg);
+      window.setTimeout(() => setErrorMessage(''), 4000);
+    }
+  };
+
   const closeReschedule = () => {
     if (rescheduling) return;
 
@@ -132,7 +162,13 @@ export default function MyBookings() {
     setRescheduleError('');
   };
 
-  const handleReschedule = async (booking) => {
+  const handleReschedule = async (bookingOrId) => {
+    let booking = bookingOrId;
+    if (typeof bookingOrId === 'number' || typeof bookingOrId === 'string') {
+      booking = bookings.find((b) => String(b.bookingId) === String(bookingOrId)) || null;
+    }
+    if (!booking) return;
+
     setRescheduleTarget(booking);
     setSelectedFlightId('');
     setRescheduleSeat(booking.seatNumber || '');
@@ -563,8 +599,8 @@ export default function MyBookings() {
             onClick={(event) => event.stopPropagation()}
             style={{
               width: '100%',
-              maxWidth: '650px',
-              maxHeight: '80vh',
+              maxWidth: '720px',
+              maxHeight: '85vh',
               overflowY: 'auto',
               backgroundColor: '#ffffff',
               borderRadius: '20px',
@@ -597,7 +633,7 @@ export default function MyBookings() {
                   }}
                 >
                   <CalendarCheck size={16} />
-                  Manage itinerary
+                  Reschedule Itinerary
                 </div>
 
                 <h2
@@ -605,10 +641,10 @@ export default function MyBookings() {
                     fontSize: '1.35rem',
                     fontWeight: 800,
                     color: '#0f172a',
-                    margin: '8px 0 4px',
+                    margin: '6px 0 4px',
                   }}
                 >
-                  Reschedule booking
+                  Flight Booking Details & Reschedule
                 </h2>
 
                 <p
@@ -618,8 +654,7 @@ export default function MyBookings() {
                     margin: 0,
                   }}
                 >
-                  Booking reference:{' '}
-                  <strong>{rescheduleTarget.bookingReference}</strong>
+                  Booking Reference: <strong style={{ color: '#0284c7', fontFamily: 'var(--font-mono)' }}>{rescheduleTarget.bookingReference}</strong>
                 </p>
               </div>
 
@@ -630,172 +665,347 @@ export default function MyBookings() {
                 aria-label="Close dialog"
                 style={{
                   border: '1px solid #e2e8f0',
-                  background: '#fff',
+                  background: '#f8fafc',
                   color: '#64748b',
                   borderRadius: '10px',
                   padding: '8px',
                   cursor: rescheduling ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Current Booking Summary */}
+            {/* Full Details of Selected Flight Booking */}
             <div
               style={{
                 marginTop: '18px',
                 border: '1px solid #e2e8f0',
                 borderRadius: '16px',
-                padding: '16px',
-                background: 'linear-gradient(135deg, #f8fafc, #f5f3ff)',
+                overflow: 'hidden',
+                backgroundColor: '#ffffff',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)',
               }}
             >
+              {/* Airline & Status Bar */}
               <div
                 style={{
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  padding: '14px 18px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  color: '#ffffff',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(255,255,255,0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Plane size={20} style={{ transform: 'rotate(-45deg)' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '1rem', letterSpacing: '-0.01em' }}>
+                      {rescheduleTarget.airline || 'Flight Booking'}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#e0f2fe' }}>
+                      Flight {rescheduleTarget.flightNumber} · {rescheduleTarget.class || 'Economy'} Class
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      fontSize: '0.78rem',
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {rescheduleTarget.bookingReference}
+                  </span>
+                  <span
+                    style={{
+                      backgroundColor:
+                        String(rescheduleTarget.bookingStatus).toLowerCase() === 'confirmed'
+                          ? '#ecfdf5'
+                          : '#f5f3ff',
+                      color:
+                        String(rescheduleTarget.bookingStatus).toLowerCase() === 'confirmed'
+                          ? '#059669'
+                          : '#7c3aed',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                    }}
+                  >
+                    {rescheduleTarget.bookingStatus}
+                  </span>
+                </div>
+              </div>
+
+              {/* Route & Times */}
+              <div
+                style={{
+                  padding: '16px 18px',
+                  backgroundColor: '#f8fafc',
+                  borderBottom: '1px solid #e2e8f0',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto 1fr',
+                    alignItems: 'center',
+                    gap: '12px',
+                  }}
+                >
+                  {/* Origin */}
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        textTransform: 'uppercase',
+                        color: '#64748b',
+                        fontWeight: 700,
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      Departure
+                    </div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                      {rescheduleTarget.departureTime}
+                    </div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0284c7' }}>
+                      {rescheduleTarget.fromCity}
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                      {rescheduleTarget.departureDate}
+                    </div>
+                  </div>
+
+                  {/* Midpoint Flight Path */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      minWidth: '100px',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                      {rescheduleTarget.duration || 'Direct'}
+                    </span>
+                    <div
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        margin: '4px 0',
+                      }}
+                    >
+                      <div style={{ flex: 1, height: '1.5px', backgroundColor: '#cbd5e1' }} />
+                      <Plane
+                        size={14}
+                        color="#0284c7"
+                        style={{ margin: '0 4px', transform: 'rotate(90deg)' }}
+                      />
+                      <div style={{ flex: 1, height: '1.5px', backgroundColor: '#cbd5e1' }} />
+                    </div>
+                    {rescheduleTarget.distanceKm ? (
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                        {rescheduleTarget.distanceKm} km
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* Destination */}
+                  <div style={{ textAlign: 'right' }}>
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        textTransform: 'uppercase',
+                        color: '#64748b',
+                        fontWeight: 700,
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      Arrival
+                    </div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                      {rescheduleTarget.arrivalTime || '—'}
+                    </div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0284c7' }}>
+                      {rescheduleTarget.toCity}
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                      {rescheduleTarget.arrivalDate || rescheduleTarget.departureDate}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Passenger & Ticket Information Grid */}
+              <div
+                style={{
+                  padding: '14px 18px',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                  gap: '12px',
+                  borderBottom: '1px solid #f1f5f9',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 600 }}>
+                    Passenger
+                  </div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                    {rescheduleTarget.passengerName}
+                  </div>
+                  {(rescheduleTarget.passengerAge || rescheduleTarget.passengerGender) && (
+                    <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                      {rescheduleTarget.passengerAge ? `${rescheduleTarget.passengerAge} yrs` : ''}
+                      {rescheduleTarget.passengerGender ? ` · ${rescheduleTarget.passengerGender}` : ''}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 600 }}>
+                    Seat & Class
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        backgroundColor: '#e2e8f0',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        color: '#0f172a',
+                      }}
+                    >
+                      {rescheduleTarget.seatNumber || '—'}
+                    </span>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                      {rescheduleTarget.class || 'Economy'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    {rescheduleTarget.passengerCount || 1} traveller(s)
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 600 }}>
+                    Contact Email
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#334155', marginTop: '2px', wordBreak: 'break-all' }}>
+                    {rescheduleTarget.passengerEmail || '—'}
+                  </div>
+                  {rescheduleTarget.passengerPhone && (
+                    <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                      {rescheduleTarget.passengerPhone}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 600 }}>
+                    Booking Date
+                  </div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginTop: '2px' }}>
+                    {formatDisplayDate(rescheduleTarget.bookingDate)}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 600 }}>
+                    Payment: {rescheduleTarget.paymentStatus || 'Paid'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial Breakdown */}
+              <div
+                style={{
+                  padding: '12px 18px',
+                  backgroundColor: '#f8fafc',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   flexWrap: 'wrap',
-                  gap: '10px',
-                }}
-              >
-                <span
-                  style={{
-                    color: '#64748b',
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                  }}
-                >
-                  Current flight
-                </span>
-
-                <span
-                  style={{
-                    background: '#ede9fe',
-                    color: '#6d28d9',
-                    padding: '5px 9px',
-                    borderRadius: '999px',
-                    fontSize: '0.76rem',
-                    fontWeight: 800,
-                  }}
-                >
-                  {rescheduleTarget.flightNumber}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto 1fr',
-                  alignItems: 'center',
                   gap: '12px',
-                  marginTop: '14px',
+                  fontSize: '0.82rem',
                 }}
               >
-                <div>
-                  <div
-                    style={{
-                      fontSize: '1.15rem',
-                      fontWeight: 800,
-                      color: '#0f172a',
-                    }}
-                  >
-                    {rescheduleTarget.fromCity}
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Base Fare: </span>
+                    <strong style={{ color: '#334155' }}>
+                      {formatINR(rescheduleTarget.baseFare ?? rescheduleTarget.finalAmount ?? rescheduleTarget.ticketPrice)}
+                    </strong>
                   </div>
 
-                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>
-                    {rescheduleTarget.departureDate}
-                  </div>
+                  {Number(rescheduleTarget.discountAmount || 0) > 0 && (
+                    <div>
+                      <span style={{ color: '#059669' }}>Discount: </span>
+                      <strong style={{ color: '#059669' }}>
+                        -{formatINR(rescheduleTarget.discountAmount)}
+                      </strong>
+                      {rescheduleTarget.appliedCouponCode && (
+                        <span style={{ fontSize: '0.74rem', color: '#059669', marginLeft: '4px' }}>
+                          ({rescheduleTarget.appliedCouponCode})
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-                  <div
-                    style={{
-                      color: '#334155',
-                      fontWeight: 700,
-                      marginTop: '3px',
-                    }}
-                  >
-                    {rescheduleTarget.departureTime}
-                  </div>
+                  {Number(rescheduleTarget.pointsDiscountAmount || 0) > 0 && !rescheduleTarget.discountAmount && (
+                    <div>
+                      <span style={{ color: '#059669' }}>Points: </span>
+                      <strong style={{ color: '#059669' }}>
+                        -{formatINR(rescheduleTarget.pointsDiscountAmount)}
+                      </strong>
+                    </div>
+                  )}
                 </div>
 
-                <Plane size={20} color="#7c3aed" />
-
-                <div style={{ textAlign: 'right' }}>
-                  <div
-                    style={{
-                      fontSize: '1.15rem',
-                      fontWeight: 800,
-                      color: '#0f172a',
-                    }}
-                  >
-                    {rescheduleTarget.toCity}
-                  </div>
-
-                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>
-                    Destination
-                  </div>
-
-                  <div
-                    style={{
-                      color: '#334155',
-                      fontWeight: 700,
-                      marginTop: '3px',
-                    }}
-                  >
-                    {rescheduleTarget.arrivalTime || '—'}
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: '#475569', fontWeight: 600 }}>Total Paid:</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                    {formatINR(rescheduleTarget.finalAmount ?? rescheduleTarget.ticketPrice)}
+                  </span>
                 </div>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '14px',
-                  flexWrap: 'wrap',
-                  borderTop: '1px solid #e2e8f0',
-                  marginTop: '14px',
-                  paddingTop: '12px',
-                  color: '#475569',
-                  fontSize: '0.8rem',
-                }}
-              >
-                <span
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                  }}
-                >
-                  <UserRound size={14} />
-                  {rescheduleTarget.passengerName || 'Passenger'}
-                </span>
-
-                <span
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                  }}
-                >
-                  <Armchair size={14} />
-                  Seat {rescheduleTarget.seatNumber || '—'}
-                </span>
-
-                <span
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                  }}
-                >
-                  <IndianRupee size={14} />
-                  Fare remains the same
-                </span>
               </div>
             </div>
+
+            {/* Reschedule Flight Section Header */}
+            <div style={{ marginTop: '22px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CalendarCheck size={18} color="#7c3aed" />
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                Select New Travel Date & Flight
+              </h3>
+            </div>
+            <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+              Choose a new travel date and flight for {rescheduleTarget.fromCity} → {rescheduleTarget.toCity}. Fare remains the same because the route is unchanged.
+            </p>
 
             {/* Reschedule Error */}
             {rescheduleError && (
@@ -1066,6 +1276,21 @@ export default function MyBookings() {
                 The fare stays the same because the route is unchanged. Seat
                 availability will be validated when you confirm.
               </p>
+            </div>
+
+            <div style={{ marginTop: '18px' }}>
+              <label
+                htmlFor="reschedule-seat"
+                style={{
+                  display: 'block',
+                  fontSize: '0.86rem',
+                  fontWeight: 800,
+                  color: '#334155',
+                  marginBottom: '8px',
+                }}
+              >
+                Available Seat
+              </label>
             </div>
 
             {/* Dialog Actions */}

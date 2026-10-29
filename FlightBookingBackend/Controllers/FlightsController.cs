@@ -161,6 +161,22 @@ namespace FlightBookingBackend.Controllers
             }
         }
 
+        [HttpGet("{id:int}/booked-seats")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetBookedSeats(int id)
+        {
+            try
+            {
+                var bookedSeats = await _flightService.GetBookedSeatsAsync(id);
+                return Ok(bookedSeats);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving booked seats for flight {Id}", id);
+                return StatusCode(500, new { message = "Error retrieving booked seats." });
+            }
+        }
+
         [HttpDelete("{id:int}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteFlight(int id)

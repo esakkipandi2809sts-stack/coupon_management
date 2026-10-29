@@ -5,7 +5,7 @@ import {
   ShieldCheck, ChevronRight, ArrowRight, ChevronDown
 } from 'lucide-react';
 
-import { bookingApi, couponApi } from '../services/api';
+import { bookingApi, couponApi, flightApi } from '../services/api';
 import { authUtil } from '../utils/auth';
 import { calculateClassFare, formatINR } from '../utils/flightPricing';
 
@@ -110,6 +110,12 @@ export default function FlightBooking() {
   // Points are only used to CREATE a coupon; the coupon is then applied via the code box.
   const [pointsToRedeem, setPointsToRedeem] = useState('');
 
+  const [bookedSeats, setBookedSeats] = useState(() => {
+    return Array.isArray(flight?.bookedSeats)
+      ? flight.bookedSeats.map(s => String(s).trim().toUpperCase())
+      : [];
+  });
+
   const [formErrors, setFormErrors] = useState({});
   const [bookingError, setBookingError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -149,10 +155,24 @@ export default function FlightBooking() {
     }
   }, []);
 
+  const loadBookedSeats = useCallback(async () => {
+    const flightId = flight?.flightId || flight?.id;
+    if (!flightId) return;
+    try {
+      const response = await flightApi.getBookedSeats(flightId);
+      if (Array.isArray(response.data)) {
+        setBookedSeats(response.data.map(s => String(s).trim().toUpperCase()));
+      }
+    } catch (err) {
+      console.error('Failed to load booked seats for flight', err);
+    }
+  }, [flight?.flightId, flight?.id]);
+
   useEffect(() => {
     loadPassengerCoupons();
     loadCouponBalance();
-  }, [loadPassengerCoupons, loadCouponBalance]);
+    loadBookedSeats();
+  }, [loadPassengerCoupons, loadCouponBalance, loadBookedSeats]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -228,10 +248,14 @@ export default function FlightBooking() {
 
       if (passenger.seat) {
         const seat = passenger.seat.trim().toUpperCase();
-        const duplicateSeat = passengers.some((other, otherIndex) =>
-          otherIndex !== index && other.seat.trim().toUpperCase() === seat
-        );
-        if (duplicateSeat) err.seat = 'This seat is selected by another passenger.';
+        if (bookedSeats.includes(seat)) {
+          err.seat = `Seat ${seat} has already been booked. Please choose another seat.`;
+        } else {
+          const duplicateSeat = passengers.some((other, otherIndex) =>
+            otherIndex !== index && other.seat.trim().toUpperCase() === seat
+          );
+          if (duplicateSeat) err.seat = 'This seat is selected by another passenger.';
+        }
       }
 
       if (Object.keys(err).length) errors[index] = err;
@@ -566,14 +590,47 @@ export default function FlightBooking() {
           gap: 14px;
         }
         .booking-seat {
-          padding: 7px 10px;
-          border-radius: 7px;
-          border: 1px solid #cbd5e1;
-          background: #f8fafc;
-          cursor: pointer;
+          padding: 7px 11px;
+          border-radius: 8px;
+          border: 1px solid transparent;
           font-weight: 600;
+          font-size: 0.85rem;
+          transition: all 0.15s ease-in-out;
         }
-        .booking-seat:disabled { opacity: 0.35; cursor: not-allowed; }
+        .booking-seat-available {
+          border-color: #cbd5e1;
+          background: #ffffff;
+          color: #1e293b;
+          cursor: pointer;
+        }
+        .booking-seat-available:hover {
+          border-color: #0284c7;
+          background: #f0f9ff;
+          color: #0284c7;
+        }
+        .booking-seat-selected {
+          border-color: #0284c7;
+          background: #0284c7;
+          color: #ffffff;
+          box-shadow: 0 2px 4px rgba(2, 132, 199, 0.3);
+          cursor: pointer;
+        }
+        .booking-seat-booked {
+          border-color: #f87171 !important;
+          background: #fee2e2 !important;
+          color: #b91c1c !important;
+          cursor: not-allowed !important;
+          opacity: 0.95 !important;
+          text-decoration: line-through;
+        }
+        .booking-seat-taken {
+          border-color: #e2e8f0 !important;
+          background: #f1f5f9 !important;
+          color: #94a3b8 !important;
+          cursor: not-allowed !important;
+          opacity: 0.6 !important;
+        }
+        .booking-seat:disabled { cursor: not-allowed; }
         @media (max-width: 990px) {
           .booking-grid { grid-template-columns: minmax(0, 1fr); }
         }
@@ -737,32 +794,71 @@ export default function FlightBooking() {
                     </div>
 
                     <div style={{ marginTop: 14 }}>
-                      <span style={{
-                        display: 'block', fontSize: '0.8rem', fontWeight: 600,
-                        marginBottom: 8, color: '#475569'
+                      <div style={{
+                        display: 'flex', justifyContent: 'space-between',
+                        alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6
                       }}>
-                        Select a sample seat
-                      </span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>
+                          Select a Seat
+                        </span>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          fontSize: '0.75rem', color: '#64748b'
+                        }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{
+                              width: 10, height: 10, borderRadius: 2,
+                              border: '1px solid #cbd5e1', background: '#ffffff', display: 'inline-block'
+                            }} />
+                            Available
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{
+                              width: 10, height: 10, borderRadius: 2,
+                              background: '#0284c7', display: 'inline-block'
+                            }} />
+                            Selected
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{
+                              width: 10, height: 10, borderRadius: 2,
+                              border: '1px solid #f87171', background: '#fee2e2', display: 'inline-block'
+                            }} />
+                            <strong style={{ color: '#b91c1c' }}>Booked</strong>
+                          </span>
+                        </div>
+                      </div>
 
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {SAMPLE_SEATS.map(seat => {
+                          const isBooked = bookedSeats.includes(seat.toUpperCase());
                           const takenByOther = passengers.some((other, otherIndex) =>
                             otherIndex !== index && other.seat.trim().toUpperCase() === seat
                           );
                           const selected = selectedSeat === seat;
 
+                          let seatClass = 'booking-seat booking-seat-available';
+                          let seatTitle = `Seat ${seat} is available`;
+
+                          if (isBooked) {
+                            seatClass = 'booking-seat booking-seat-booked';
+                            seatTitle = `Seat ${seat} is already booked on this flight`;
+                          } else if (selected) {
+                            seatClass = 'booking-seat booking-seat-selected';
+                            seatTitle = `Seat ${seat} is selected`;
+                          } else if (takenByOther) {
+                            seatClass = 'booking-seat booking-seat-taken';
+                            seatTitle = `Seat ${seat} is chosen by another passenger`;
+                          }
+
                           return (
                             <button
                               type="button"
                               key={seat}
-                              disabled={takenByOther}
-                              className="booking-seat"
-                              onClick={() => updatePassenger(index, 'seat', seat)}
-                              style={{
-                                borderColor: selected ? '#0284c7' : '#cbd5e1',
-                                background: selected ? '#e0f2fe' : '#f8fafc',
-                                color: selected ? '#0369a1' : '#334155'
-                              }}
+                              disabled={isBooked || takenByOther}
+                              className={seatClass}
+                              title={seatTitle}
+                              onClick={() => updatePassenger(index, 'seat', selected ? '' : seat)}
                             >
                               {seat}
                             </button>
@@ -770,8 +866,8 @@ export default function FlightBooking() {
                         })}
                       </div>
 
-                      <small style={{ color: '#64748b' }}>
-                        Sample seats only. Actual seat availability must be verified by the backend.
+                      <small style={{ color: '#64748b', display: 'block', marginTop: 6 }}>
+                        Booked seats are marked in red and cannot be selected. Click an available seat to pick or change.
                       </small>
                     </div>
                   </div>

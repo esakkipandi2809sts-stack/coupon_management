@@ -25,6 +25,7 @@ namespace FlightBookingBackend.DTOs
         public string TripType { get; set; } = "OneWay";
         public Guid? ItineraryId { get; set; }
         public int? SegmentOrder { get; set; }
+        public List<string> BookedSeats { get; set; } = new();
     }
 
     public class FlightSearchQueryDto

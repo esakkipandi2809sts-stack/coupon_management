@@ -9,5 +9,6 @@ namespace FlightBookingBackend.Services
         Task<BookingDetailDto?> GetBookingByIdAsync(int bookingId, int userId);
         Task<(bool Success, string Message)> CancelBookingAsync(int bookingId, int userId, bool isAdmin = false);
         Task<(bool Success, string Message, BookingDetailDto? Booking)> RescheduleBookingAsync(int bookingId, int userId, RescheduleBookingDto dto);
+        Task<(bool Success, string Message, BookingDetailDto? Booking)> RescheduleBookingDirectAsync(int bookingId, int userId);
     }
 }

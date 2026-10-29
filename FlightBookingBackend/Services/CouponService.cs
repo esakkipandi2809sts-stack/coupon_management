@@ -35,6 +35,7 @@ namespace FlightBookingBackend.Services
                 .Include(c => c.GeneratedForBooking)
                     .ThenInclude(b => b!.Flight)
                 .Where(c => c.UserId == userId &&
+                            c.Status != "Cancelled" &&
                             (c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled))
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
@@ -50,7 +51,8 @@ namespace FlightBookingBackend.Services
                 .AsNoTracking()
                 .Include(c => c.GeneratedForBooking)
                     .ThenInclude(b => b!.Flight)
-                .Where(c => c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled)
+                .Where(c => c.Status != "Cancelled" &&
+                            (c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled))
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
             var ownerIds = coupons
@@ -78,12 +80,13 @@ namespace FlightBookingBackend.Services
         {
             await RefreshStatusesAsync();
             var coupons = _context.Coupons.Where(c => c.UserId == userId &&
+                                                      c.Status != "Cancelled" &&
                                                       (c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled));
-            var totalCoupons = await coupons.CountAsync();
             var availableCoupons = await coupons.CountAsync(c => c.Status == "Available");
             var pendingCoupons = await coupons.CountAsync(c => c.Status == "Pending");
             var usedCoupons = await coupons.CountAsync(c => c.Status == "Used");
-            var expiredCoupons = await coupons.CountAsync(c => c.Status == "Expired");
+            var expiredCoupons = await coupons.CountAsync(c => c.Status == "Expired" || c.Status == "Inactive");
+            var totalCoupons = availableCoupons + pendingCoupons + usedCoupons + expiredCoupons;
 
             return new CouponStatisticsDto
             {
@@ -100,14 +103,21 @@ namespace FlightBookingBackend.Services
             await RefreshStatusesAsync();
             var coupons = _context.Coupons
                 .AsNoTracking()
-                .Where(c => c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled);
+                .Where(c => c.Status != "Cancelled" &&
+                            (c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled));
+            var availableCoupons = await coupons.CountAsync(c => c.Status == "Available");
+            var pendingCoupons = await coupons.CountAsync(c => c.Status == "Pending");
+            var usedCoupons = await coupons.CountAsync(c => c.Status == "Used");
+            var expiredCoupons = await coupons.CountAsync(c => c.Status == "Expired" || c.Status == "Inactive");
+            var totalCoupons = availableCoupons + pendingCoupons + usedCoupons + expiredCoupons;
+
             return new CouponStatisticsDto
             {
-                AvailableCoupons = await coupons.CountAsync(c => c.Status == "Available"),
-                PendingCoupons = await coupons.CountAsync(c => c.Status == "Pending"),
-                UsedCoupons = await coupons.CountAsync(c => c.Status == "Used"),
-                ExpiredCoupons = await coupons.CountAsync(c => c.Status == "Expired"),
-                TotalCoupons = await coupons.CountAsync()
+                AvailableCoupons = availableCoupons,
+                PendingCoupons = pendingCoupons,
+                UsedCoupons = usedCoupons,
+                ExpiredCoupons = expiredCoupons,
+                TotalCoupons = totalCoupons
             };
         }
 

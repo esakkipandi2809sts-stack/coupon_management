@@ -150,5 +150,27 @@ namespace FlightBookingBackend.Controllers
                 return StatusCode(500, new { message = "Error rescheduling booking." });
             }
         }
+
+        [HttpPut("{id:int}/reschedule-direct")]
+        public async Task<IActionResult> RescheduleBookingDirect(int id)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var (success, message, booking) = await _bookingService.RescheduleBookingDirectAsync(id, userId);
+
+                if (!success)
+                {
+                    return BadRequest(new { message });
+                }
+
+                return Ok(new { message, booking });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error directly updating booking {Id} status to Rescheduled", id);
+                return StatusCode(500, new { message = "Error updating booking status." });
+            }
+        }
     }
 }

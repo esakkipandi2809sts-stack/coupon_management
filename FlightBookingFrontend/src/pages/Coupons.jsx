@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Tag,
@@ -83,31 +83,69 @@ export default function Coupons() {
     navigate('/availability', { state: { couponCode: code } });
   };
 
-  // Filter coupons by tab and search
-  const filteredCoupons = coupons.filter((c) => {
-    if (c.bookingStatus === 'Cancelled') return false;
-    if (
-      c.description?.toLowerCase().includes('points redemption') ||
-      (!c.bookingReference && (!c.originalFlightFare || Number(c.originalFlightFare) === 0))
-    ) {
-      return false;
-    }
-    if (activeTab === 'available' && c.status.toLowerCase() !== 'available') return false;
-    if (activeTab === 'pending' && c.status.toLowerCase() !== 'pending') return false;
-    if (activeTab === 'used' && c.status.toLowerCase() !== 'used') return false;
-    if (activeTab === 'expired' && c.status.toLowerCase() !== 'expired') return false;
+  // Base flight reward coupons (excluding cancelled and point-redemption coupons)
+  const displayableCoupons = useMemo(() => {
+    return coupons.filter((c) => {
+      if (c.status?.toLowerCase() === 'cancelled') return false;
+      if (c.bookingStatus === 'Cancelled') return false;
+      if (
+        c.description?.toLowerCase().includes('points redemption') ||
+        (!c.bookingReference && (!c.originalFlightFare || Number(c.originalFlightFare) === 0))
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [coupons]);
 
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      return (
-        c.couponCode.toLowerCase().includes(term) ||
-        c.description.toLowerCase().includes(term) ||
-        (c.bookingReference || '').toLowerCase().includes(term) ||
-        (c.ownerUsername || '').toLowerCase().includes(term)
-      );
+  // Accurately compute coupon stats so Total Coupons strictly equals Available + Pending + Used + Expired
+  const couponStats = useMemo(() => {
+    if (!isAdmin) {
+      const available = displayableCoupons.filter(c => c.status?.toLowerCase() === 'available').length;
+      const pending = displayableCoupons.filter(c => c.status?.toLowerCase() === 'pending').length;
+      const used = displayableCoupons.filter(c => c.status?.toLowerCase() === 'used').length;
+      const expired = displayableCoupons.filter(c => c.status?.toLowerCase() === 'expired').length;
+      return {
+        availableCoupons: available,
+        pendingCoupons: pending,
+        usedCoupons: used,
+        expiredCoupons: expired,
+        totalCoupons: available + pending + used + expired
+      };
     }
-    return true;
-  });
+    const available = Number(stats.availableCoupons) || 0;
+    const pending = Number(stats.pendingCoupons) || 0;
+    const used = Number(stats.usedCoupons) || 0;
+    const expired = Number(stats.expiredCoupons) || 0;
+    return {
+      availableCoupons: available,
+      pendingCoupons: pending,
+      usedCoupons: used,
+      expiredCoupons: expired,
+      totalCoupons: available + pending + used + expired
+    };
+  }, [isAdmin, displayableCoupons, stats]);
+
+  // Filter coupons by tab and search
+  const filteredCoupons = useMemo(() => {
+    return displayableCoupons.filter((c) => {
+      if (activeTab === 'available' && c.status.toLowerCase() !== 'available') return false;
+      if (activeTab === 'pending' && c.status.toLowerCase() !== 'pending') return false;
+      if (activeTab === 'used' && c.status.toLowerCase() !== 'used') return false;
+      if (activeTab === 'expired' && c.status.toLowerCase() !== 'expired') return false;
+
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        return (
+          c.couponCode.toLowerCase().includes(term) ||
+          c.description.toLowerCase().includes(term) ||
+          (c.bookingReference || '').toLowerCase().includes(term) ||
+          (c.ownerUsername || '').toLowerCase().includes(term)
+        );
+      }
+      return true;
+    });
+  }, [displayableCoupons, activeTab, searchTerm]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }} className="animate-fade-in">
@@ -225,7 +263,7 @@ export default function Coupons() {
             <Tag size={18} color="#0284c7" />
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0284c7', marginTop: '8px' }}>
-            {stats.availableCoupons}
+            {couponStats.availableCoupons}
           </div>
         </div>
 
@@ -245,7 +283,7 @@ export default function Coupons() {
             <Clock size={18} color="#d97706" />
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#d97706', marginTop: '8px' }}>
-            {stats.pendingCoupons}
+            {couponStats.pendingCoupons}
           </div>
         </div>
 
@@ -265,7 +303,7 @@ export default function Coupons() {
             <CheckCircle2 size={18} color="#2563eb" />
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#2563eb', marginTop: '8px' }}>
-            {stats.usedCoupons}
+            {couponStats.usedCoupons}
           </div>
         </div>
 
@@ -285,7 +323,7 @@ export default function Coupons() {
             <AlertCircle size={18} color="#64748b" />
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#64748b', marginTop: '8px' }}>
-            {stats.expiredCoupons}
+            {couponStats.expiredCoupons}
           </div>
         </div>
 
@@ -305,7 +343,7 @@ export default function Coupons() {
             <Layers size={18} color="#7c3aed" />
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#7c3aed', marginTop: '8px' }}>
-            {stats.totalCoupons}
+            {couponStats.totalCoupons}
           </div>
         </div>
       </div>

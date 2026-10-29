@@ -691,6 +691,34 @@ namespace FlightBookingBackend.Services
             return (true, "Booking rescheduled successfully.", updated);
         }
 
+        public async Task<(bool Success, string Message, BookingDetailDto? Booking)> RescheduleBookingDirectAsync(int bookingId, int userId)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Flight)
+                .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId);
+
+            if (booking == null)
+            {
+                return (false, "Booking not found.", null);
+            }
+
+            if (string.Equals(booking.BookingStatus, BookingStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, "A cancelled booking cannot be rescheduled.", null);
+            }
+
+            if (string.Equals(booking.BookingStatus, BookingStatuses.Failed, StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, "A failed booking cannot be rescheduled.", null);
+            }
+
+            booking.BookingStatus = BookingStatuses.Rescheduled;
+            await _context.SaveChangesAsync();
+
+            var updated = await GetBookingByIdAsync(bookingId, userId);
+            return (true, "Booking status updated to Rescheduled successfully.", updated);
+        }
+
         private static BookingDetailDto MapToDetailDto(Booking b)
         {
             var couponUsage = b.CouponUsages.FirstOrDefault();

@@ -87,6 +87,8 @@ export const flightApi = {
 
   getById: (id) => api.get(`/flights/${id}`),
 
+  getBookedSeats: (id) => api.get(`/flights/${id}/booked-seats`),
+
   getCities: () => api.get('/flights/cities'),
 
   getSearchOptions: () => api.get('/flights/search-options'),
@@ -118,6 +120,8 @@ export const bookingApi = {
       newFlightId,
       seatNumber,
     }),
+
+  rescheduleDirect: (id) => api.put(`/bookings/${id}/reschedule-direct`),
 };
 
 // Coupon APIs

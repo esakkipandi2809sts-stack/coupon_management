@@ -1,5 +1,5 @@
-import React from 'react';
-import { Eye, XCircle, Download, FileText, CalendarClock } from 'lucide-react';
+import React, { useState } from 'react';
+import { Eye, XCircle, Download, FileText, CalendarClock, Edit3, X } from 'lucide-react';
 import { formatINR } from '../utils/flightPricing';
 
 const STATUS_BADGES = {
@@ -27,6 +27,8 @@ const formatCancelDate = (dateVal) => {
 };
 
 export default function BookingTable({ bookings, onView, onCancel, onDownload, onReschedule }) {
+  const [editTarget, setEditTarget] = useState(null);
+
   if (!bookings || bookings.length === 0) {
     return (
       <div
@@ -134,63 +136,10 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                 </td>
 
                 {/* Status */}
-                <td style={{ padding: '16px 18px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span className={`badge ${STATUS_BADGES[b.bookingStatus] || 'badge-pending'}`}>
-                        {b.bookingStatus}
-                      </span>                      
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-
-
-                      {isActiveBooking(b) && onReschedule && (
-                        <button
-                          onClick={() => onReschedule(b)}
-                          title="Reschedule Booking"
-                          className="badge-Reschedule"
-                          style={{
-                            padding: '6px 10px',
-                            borderRadius: '8px',
-                            backgroundColor: '#f5f3ff',
-                            color: '#7c3aed',
-                            border: '1px solid #ddd6fe',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '0.78rem',
-                            fontWeight: 600
-                          }}
-                        >
-                          <CalendarClock size={14} />
-                          <span>Reschedule</span>
-                        </button>
-                      )}
-
-                      {isActiveBooking(b) && (
-                        <button
-                          onClick={() => onCancel(b.bookingId)}
-                          title="Cancel Ticket"
-                          style={{
-                            padding: '6px 10px',
-                            borderRadius: '8px',
-                            color: '#dc2626',
-                            backgroundColor: '#fef2f2',
-                            border: '1px solid #fecaca',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <XCircle size={14} />
-                          <span>Cancel</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                <td style={{ padding: '16px 18px', textAlign: 'center' }}>
+                  <span className={`badge ${STATUS_BADGES[b.bookingStatus] || 'badge-pending'}`}>
+                    {b.bookingStatus}
+                  </span>
                 </td>
 
 
@@ -240,7 +189,28 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
                       </button>
                     )}
 
-
+                    <button
+                      onClick={() => setEditTarget(b)}  
+                      disabled={!isActiveBooking(b)}
+                      title={isActiveBooking(b) ? 'Edit Booking (Reschedule or Cancel)' : `Cannot edit ${b.bookingStatus?.toLowerCase()} booking`}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        backgroundColor: isActiveBooking(b) ? '#f8fafc' : '#f1f5f9',
+                        color: isActiveBooking(b) ? '#0284c7' : '#94a3b8',
+                        border: '1px solid #cbd5e1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: isActiveBooking(b) ? 'pointer' : 'not-allowed',
+                        opacity: isActiveBooking(b) ? 1 : 0.6
+                      }}
+                    >
+                      <Edit3 size={14} />
+                      <span>Edit</span>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -248,6 +218,192 @@ export default function BookingTable({ bookings, onView, onCancel, onDownload, o
           </tbody>
         </table>
       </div>
+
+      {/* Edit Booking Popup (Rescheduled or Cancelled) */}
+      {editTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setEditTarget(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1050,
+            padding: '16px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '440px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              padding: '24px 28px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+                  Edit Booking
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#64748b' }}>
+                  Reference: <strong style={{ color: '#0284c7', fontFamily: 'var(--font-mono)' }}>{editTarget.bookingReference}</strong>
+                </p>
+                <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                  Route: {editTarget.fromCity} → {editTarget.toCity} ({editTarget.departureDate})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditTarget(null)}
+                style={{
+                  border: 0,
+                  background: '#f1f5f9',
+                  borderRadius: '10px',
+                  width: '34px',
+                  height: '34px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', lineHeight: 1.4 }}>
+              Choose an action for this booking:
+            </p>
+
+            {/* Action Buttons: Only Rescheduled and Cancelled */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Option 1: Reschedule */}
+              <button
+                type="button"
+                onClick={() => {
+                  const targetBooking = editTarget;
+                  setEditTarget(null);
+                  if (onReschedule) onReschedule(targetBooking);
+                }}
+                style={{
+                  padding: '16px',
+                  borderRadius: '14px',
+                  backgroundColor: '#f5f3ff',
+                  border: '1.5px solid #ddd6fe',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '14px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#7c3aed'; e.currentTarget.style.backgroundColor = '#ede9fe'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#ddd6fe'; e.currentTarget.style.backgroundColor = '#f5f3ff'; }}
+              >
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #ddd6fe',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <CalendarClock size={22} color="#7c3aed" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: '#6d28d9' }}>
+                    Reschedule
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#7c3aed', marginTop: '2px' }}>
+                    View full booking details and choose a new flight
+                  </div>
+                </div>
+              </button>
+
+              {/* Option 2: Cancelled */}
+              <button
+                type="button"
+                onClick={() => {
+                  const targetId = editTarget.bookingId;
+                  setEditTarget(null);
+                  if (onCancel) onCancel(targetId);
+                }}
+                style={{
+                  padding: '16px',
+                  borderRadius: '14px',
+                  backgroundColor: '#fef2f2',
+                  border: '1.5px solid #fecaca',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '14px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#dc2626'; e.currentTarget.style.backgroundColor = '#fee2e2'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#fecaca'; e.currentTarget.style.backgroundColor = '#fef2f2'; }}
+              >
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #fecaca',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <XCircle size={22} color="#dc2626" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: '#b91c1c' }}>
+                    Cancelled
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#dc2626', marginTop: '2px' }}>
+                    Cancel this ticket and release your seat
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => setEditTarget(null)}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
