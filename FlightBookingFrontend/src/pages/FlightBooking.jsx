@@ -816,9 +816,9 @@ export default function FlightBooking() {
 
           {/* Passengers */}
           <section style={styles.card}>
-            <h2 style={{ fontSize: '1.15rem', marginbottom: '5px' }}>Passenger Details</h2>
+            <h2 style={{ fontSize: '1.15rem', marginTop: 0 }}>Passenger Details</h2>
 
-            <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
+            <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '10px' }}>
               Add details for all {passengerCount} passenger(s).
             </p>
 
