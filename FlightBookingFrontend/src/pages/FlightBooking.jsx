@@ -8,6 +8,7 @@ import {
 import { bookingApi, couponApi, flightApi } from '../services/api';
 import { authUtil } from '../utils/auth';
 import { calculateClassFare, formatINR } from '../utils/flightPricing';
+import { getFlightDetails } from '../utils/flightRoute';
 import './Availability.css';
 
 const EMPTY_PASSENGER = {
@@ -114,9 +115,7 @@ function SeatMap({
         <div className="plane-tail">Rear</div>
       </div>
 
-      <p className="seatmap-note">
-        {selectedSeat ? `Selected seat: ${selectedSeat}` : 'Tap a seat to pick or change.'}
-      </p>
+
     </div>
   );
 }
@@ -788,30 +787,80 @@ export default function FlightBooking() {
               </div>
             </div>
 
-            <div style={{
-              display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center',
-              gap: 12, padding: 16, borderRadius: 12, background: '#f8fafc'
-            }}>
-              <div>
-                <strong style={{ fontSize: '1.2rem' }}>{flight.departureTime}</strong>
-                <div>{flight.fromCity}</div>
-                <small style={{ color: '#64748b' }}>{flight.departureDate}</small>
-              </div>
+            {(() => {
+              const flightDetails = getFlightDetails(flight);
+              return (
+                <>
+                  <div style={{
+                    display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center',
+                    gap: 12, padding: 16, borderRadius: 12, background: '#f8fafc'
+                  }}>
+                    <div>
+                      <strong style={{ fontSize: '1.2rem' }}>{flight.departureTime}</strong>
+                      <div>{flightDetails.fromCity || flight.fromCity}</div>
+                      <small style={{ color: '#64748b' }}>{flight.departureDate}</small>
+                    </div>
 
-              <div style={{ textAlign: 'center', color: '#64748b' }}>
-                <Clock size={15} />
-                <div style={{ fontSize: '0.8rem' }}>{flight.duration}</div>
-                <div style={{ marginTop: 6 }}>
-                  {flight.distanceKm ? `${flight.distanceKm} km` : 'Distance unavailable'}
-                </div>
-              </div>
+                    <div style={{ textAlign: 'center', color: '#64748b' }}>
+                      <Clock size={15} />
+                      <div style={{ fontSize: '0.8rem' }}>{flightDetails.duration}</div>
+                      <div style={{ marginTop: 6, fontSize: '0.78rem' }}>
+                        {flightDetails.distanceDisplay} · {flightDetails.flightType}
+                      </div>
+                    </div>
 
-              <div style={{ textAlign: 'right' }}>
-                <strong style={{ fontSize: '1.2rem' }}>{flight.arrivalTime}</strong>
-                <div>{flight.toCity}</div>
-                <small style={{ color: '#64748b' }}>{flight.arrivalDate}</small>
-              </div>
-            </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <strong style={{ fontSize: '1.2rem' }}>{flight.arrivalTime}</strong>
+                      <div>{flightDetails.toCity || flight.toCity}</div>
+                      <small style={{ color: '#64748b' }}>{flight.arrivalDate}</small>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    marginTop: 14,
+                    padding: '14px 16px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 12
+                  }}>
+                    <h3 style={{ margin: '0 0 10px 0', fontSize: '0.92rem', color: '#0f172a' }}>
+                      Flight Details
+                    </h3>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                      gap: 12,
+                      fontSize: '0.82rem'
+                    }}>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>From City:</span>
+                        <strong>{flightDetails.fromCity}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>To City:</span>
+                        <strong>{flightDetails.toCity}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Distance:</span>
+                        <strong>{flightDetails.distanceDisplay}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Stop Count:</span>
+                        <strong>{flightDetails.stopCount}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Flight Type:</span>
+                        <strong>{flightDetails.flightType}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Duration:</span>
+                        <strong>{flightDetails.duration}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </section>
 
           {/* Passengers */}

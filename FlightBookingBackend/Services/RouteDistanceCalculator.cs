@@ -1,15 +1,13 @@
 namespace FlightBookingBackend.Services
 {
     /// <summary>
-    /// Calculates the route distance between two supported Indian cities.
-    /// Uses the same city table and formula as the Flight Management form
-    /// (great-circle distance x 1.1 routing allowance), so legacy flights that were
-    /// stored without a distance can be repaired consistently.
+    /// Calculates the approximate route distance between two supported Indian cities
+    /// using great-circle distance. Distances >= 100 km are rounded to the nearest 10 km
+    /// (e.g. Chennai to Delhi ~ 1,760 km).
     /// </summary>
     public static class RouteDistanceCalculator
     {
         private const double EarthRadiusKm = 6371d;
-        private const double RoutingAllowance = 1.1d;
 
         private static readonly Dictionary<string, (double Latitude, double Longitude)> CityCoordinates = new()
         {
@@ -84,7 +82,15 @@ namespace FlightBookingBackend.Services
                 Math.Cos(fromLatitude) * Math.Cos(toLatitude) * Math.Pow(Math.Sin(longitudeDelta / 2d), 2d);
 
             var greatCircleKm = EarthRadiusKm * 2d * Math.Atan2(Math.Sqrt(haversine), Math.Sqrt(1d - haversine));
-            var distance = Math.Round((decimal)(greatCircleKm * RoutingAllowance), 1, MidpointRounding.AwayFromZero);
+            if (greatCircleKm <= 0d)
+            {
+                return null;
+            }
+
+            var approxKm = greatCircleKm >= 100d
+                ? Math.Round(greatCircleKm / 10d, MidpointRounding.AwayFromZero) * 10d
+                : Math.Round(greatCircleKm, MidpointRounding.AwayFromZero);
+            var distance = (decimal)approxKm;
 
             return distance > 0m ? distance : null;
         }

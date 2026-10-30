@@ -39,14 +39,14 @@ WHERE correction.DistanceKm IS NOT NULL
 
 UPDATE dbo.Flights
 SET Price = CASE
-    WHEN DistanceKm * 10 < 1500 THEN 1500
-    ELSE ROUND(DistanceKm * 10, 2)
+    WHEN DistanceKm * 4 < 1500 THEN 1500
+    ELSE ROUND(DistanceKm * 4, 0)
 END
 WHERE DistanceKm IS NOT NULL
   AND DistanceKm > 0
   AND (Price IS NULL OR Price <= 0 OR Price <> CASE
-      WHEN DistanceKm * 10 < 1500 THEN 1500
-      ELSE ROUND(DistanceKm * 10, 2)
+      WHEN DistanceKm * 4 < 1500 THEN 1500
+      ELSE ROUND(DistanceKm * 4, 0)
   END);
 
 -- After entering a verified correction for every affected flight, this query

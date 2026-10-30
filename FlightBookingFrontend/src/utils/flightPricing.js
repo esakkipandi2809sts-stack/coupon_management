@@ -1,4 +1,4 @@
-const FARE_PER_KILOMETER = 10;
+const FARE_PER_KILOMETER = 4;
 const MINIMUM_ECONOMY_FARE = 1500;
 
 export function calculateEconomyFare(distanceKm) {

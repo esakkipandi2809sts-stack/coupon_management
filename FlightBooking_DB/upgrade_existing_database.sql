@@ -264,9 +264,9 @@ WHERE booking.DiscountAmount = 0
                   WHERE pointTransaction.BookingId = booking.BookingId
                     AND pointTransaction.TransactionType = N'Redeemed'));
 
--- Economy fare = MAX(DistanceKm x 10, 1500) for every flight that has a distance
+-- Economy fare = MAX(DistanceKm x 4, 1500) for every flight that has a distance
 UPDATE dbo.Flights
-SET Price = CASE WHEN DistanceKm * 10 < 1500 THEN 1500 ELSE ROUND(DistanceKm * 10, 2) END
+SET Price = CASE WHEN DistanceKm * 4 < 1500 THEN 1500 ELSE ROUND(DistanceKm * 4, 0) END
 WHERE DistanceKm IS NOT NULL AND DistanceKm > 0;
 
 COMMIT TRANSACTION;

@@ -278,8 +278,8 @@ public class FlightServiceTests
         Assert.NotNull(updated);
         Assert.Equal("UPD-101", updated!.FlightNumber);
         Assert.Equal("Mumbai", updated.FromCity);
-        Assert.Equal(5000m, updated.Price);
-        Assert.Equal(5000m, (await context.Flights.SingleAsync()).Price);
+        Assert.Equal(2000m, updated.Price);
+        Assert.Equal(2000m, (await context.Flights.SingleAsync()).Price);
     }
 
     [Fact]

@@ -10,6 +10,7 @@ namespace FlightBookingBackend.Data
         {
             EnsureLegacySchemaUpgrade(context);
             BackfillMissingFlightDistances(context);
+            FixExistingFlightFares(context);
 
             // 1. Seed demo users so the quick login flow works even when other users already exist.
             EnsureSeedUsers(context);
@@ -113,6 +114,29 @@ namespace FlightBookingBackend.Data
                 flight.DistanceKm = distance.Value;
                 flight.Price = FlightFareCalculator.CalculateEconomyFare(distance.Value);
                 changed = true;
+            }
+
+            if (changed)
+            {
+                context.SaveChanges();
+            }
+        }
+
+        private static void FixExistingFlightFares(FlightBookingDbContext context)
+        {
+            var flightsWithDistance = context.Flights
+                .Where(f => f.DistanceKm != null && f.DistanceKm > 0m)
+                .ToList();
+
+            var changed = false;
+            foreach (var flight in flightsWithDistance)
+            {
+                var expectedFare = FlightFareCalculator.CalculateEconomyFare(flight.DistanceKm!.Value);
+                if (flight.Price != expectedFare)
+                {
+                    flight.Price = expectedFare;
+                    changed = true;
+                }
             }
 
             if (changed)
@@ -470,8 +494,8 @@ IF OBJECT_ID(N'dbo.Flights', N'U') IS NOT NULL
 BEGIN
     UPDATE dbo.Flights
     SET Price = CASE
-        WHEN DistanceKm * 10 < 1500 THEN 1500
-        ELSE ROUND(DistanceKm * 10, 2)
+        WHEN DistanceKm * 4 < 1500 THEN 1500
+        ELSE ROUND(DistanceKm * 4, 0)
     END
     WHERE DistanceKm IS NOT NULL AND DistanceKm > 0;
 END;

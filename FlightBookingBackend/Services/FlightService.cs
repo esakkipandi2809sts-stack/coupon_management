@@ -153,6 +153,12 @@ namespace FlightBookingBackend.Services
                     prefix = airline.Length >= 2 ? airline.Substring(0, 2).ToUpper() : "FL";
                 }
 
+                var durationMinutes = (int)Math.Max(30d, Math.Round(((double)distance / 800d * 60d + 33d) / 5d) * 5d);
+                var durationStr = FormatDurationMinutes(durationMinutes);
+
+                var departureTime = new TimeOnly(9, 30);
+                var arrivalTime = departureTime.AddMinutes(durationMinutes);
+
                 var randomNum = Random.Shared.Next(100, 999);
                 var newFlight = new Flight
                 {
@@ -160,11 +166,12 @@ namespace FlightBookingBackend.Services
                     Airline = airline,
                     FromCity = !string.IsNullOrWhiteSpace(from) ? char.ToUpper(from.Trim()[0]) + from.Trim().Substring(1) : from,
                     ToCity = !string.IsNullOrWhiteSpace(to) ? char.ToUpper(to.Trim()[0]) + to.Trim().Substring(1) : to,
+                    StopCount = 0,
                     DepartureDate = date,
-                    DepartureTime = "09:30 AM",
+                    DepartureTime = departureTime.ToString("hh:mm tt", System.Globalization.CultureInfo.InvariantCulture),
                     ArrivalDate = date,
-                    ArrivalTime = "11:45 AM",
-                    Duration = "2h 15m",
+                    ArrivalTime = arrivalTime.ToString("hh:mm tt", System.Globalization.CultureInfo.InvariantCulture),
+                    Duration = durationStr,
                     DistanceKm = distance,
                     TotalSeats = 20,
                     AvailableSeats = 20,
@@ -355,7 +362,7 @@ namespace FlightBookingBackend.Services
                         Airline = dto.Airline.Trim(),
                         FromCity = dto.FromCity.Trim(),
                         ToCity = dto.ToCity.Trim(),
-                        StopCount = dto.StopCount,
+                        StopCount = dto.StopCount ?? 0,
                         BookingDate = dto.BookingDate ?? today,
                         DepartureDate = dto.DepartureDate,
                         DepartureTime = departureTime,
@@ -463,7 +470,7 @@ namespace FlightBookingBackend.Services
             flight.Airline = dto.Airline.Trim();
             flight.FromCity = dto.FromCity.Trim();
             flight.ToCity = dto.ToCity.Trim();
-            flight.StopCount = dto.StopCount;
+            flight.StopCount = dto.StopCount ?? 0;
             if (dto.BookingDate.HasValue)
             {
                 flight.BookingDate = dto.BookingDate.Value;
@@ -487,32 +494,57 @@ namespace FlightBookingBackend.Services
             return MapToDto(flight);
         }
 
-        private static FlightDto MapToDto(Flight f) => new FlightDto
+        private static FlightDto MapToDto(Flight f)
         {
-            FlightId = f.FlightId,
-            FlightNumber = f.FlightNumber,
-            Airline = f.Airline,
-            FromCity = f.FromCity,
-            ToCity = f.ToCity,
-            StopCount = f.StopCount,
-            BookingDate = f.BookingDate,
-            DepartureDate = f.DepartureDate,
-            DepartureTime = f.DepartureTime,
-            ArrivalDate = f.ArrivalDate,
-            ArrivalTime = f.ArrivalTime,
-            Duration = f.Duration,
-            DistanceKm = f.DistanceKm,
-            TotalSeats = f.TotalSeats,
-            AvailableSeats = f.AvailableSeats,
-            Price = f.DistanceKm is > 0m
-                ? (f.Price > 0m ? Math.Round(f.Price, 0, MidpointRounding.AwayFromZero) : FlightFareCalculator.ResolveBaseFare(f.DistanceKm))
-                : 0m,
-            Status = f.Status,
-            CreatedByUserName = f.CreatedByUserName,
-            TripType = f.TripType,
-            ItineraryId = f.ItineraryId,
-            SegmentOrder = f.SegmentOrder
-        };
+            var stopCount = f.StopCount ?? 0;
+            string duration = f.Duration;
+            if (!string.IsNullOrWhiteSpace(duration) && (duration.Contains('–') || duration.Contains('-')))
+            {
+                var split = duration.Split(new[] { '–', '-' }, StringSplitOptions.RemoveEmptyEntries);
+                if (split.Length > 0) duration = split[0].Trim();
+            }
+            if (f.DistanceKm is > 0m && (string.IsNullOrWhiteSpace(duration) || (duration.Contains('h') && !duration.Contains("hr"))))
+            {
+                var durationMinutes = (int)Math.Max(30d, Math.Round(((double)f.DistanceKm.Value / 800d * 60d + 33d) / 5d) * 5d);
+                duration = FormatDurationMinutes(durationMinutes);
+            }
 
+            return new FlightDto
+            {
+                FlightId = f.FlightId,
+                FlightNumber = f.FlightNumber,
+                Airline = f.Airline,
+                FromCity = f.FromCity,
+                ToCity = f.ToCity,
+                StopCount = stopCount,
+                BookingDate = f.BookingDate,
+                DepartureDate = f.DepartureDate,
+                DepartureTime = f.DepartureTime,
+                ArrivalDate = f.ArrivalDate,
+                ArrivalTime = f.ArrivalTime,
+                Duration = duration,
+                DistanceKm = f.DistanceKm,
+                TotalSeats = f.TotalSeats,
+                AvailableSeats = f.AvailableSeats,
+                Price = f.DistanceKm is > 0m
+                    ? (f.Price > 0m ? Math.Round(f.Price, 0, MidpointRounding.AwayFromZero) : FlightFareCalculator.ResolveBaseFare(f.DistanceKm))
+                    : 0m,
+                Status = f.Status,
+                CreatedByUserName = f.CreatedByUserName,
+                TripType = f.TripType,
+                ItineraryId = f.ItineraryId,
+                SegmentOrder = f.SegmentOrder
+            };
+        }
+
+        private static string FormatDurationMinutes(int totalMinutes)
+        {
+            var hours = totalMinutes / 60;
+            var mins = totalMinutes % 60;
+            var parts = new List<string>();
+            if (hours > 0) parts.Add($"{hours} hr");
+            if (mins > 0) parts.Add($"{mins} min");
+            return parts.Count > 0 ? string.Join(" ", parts) : "0 min";
+        }
     }
 }

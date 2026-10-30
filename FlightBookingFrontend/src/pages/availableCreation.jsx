@@ -29,6 +29,8 @@ import {
 import {
   SUPPORTED_CITY_NAMES,
   calculateRouteDistance,
+  formatDistance,
+  getFlightDetails,
   isSameCity,
   recalculateSegment,
   toTimestamp,
@@ -72,6 +74,7 @@ const emptySegment = (overrides = {}) => ({
   airline: '',
   fromCity: '',
   toCity: '',
+  stopCount: 0,
   distanceKm: '',  
   price: '',
   departureDate: '',
@@ -118,11 +121,13 @@ function segmentLabel(tripType, index) {
 
 function toPayload(segment) {
   const priceVal = parseFloat(segment.price);
+  const stopCountVal = parseInt(segment.stopCount, 10);
   return {
     flightNumber: segment.flightNumber.trim(),
     airline: segment.airline.trim(),
     fromCity: segment.fromCity.trim(),
     toCity: segment.toCity.trim(),
+    stopCount: Number.isInteger(stopCountVal) && stopCountVal >= 0 ? stopCountVal : 0,
     distanceKm: parseFloat(segment.distanceKm),
     price: !Number.isNaN(priceVal) && priceVal > 0 ? Math.round(priceVal) : undefined,
     departureDate: segment.departureDate,
@@ -142,6 +147,7 @@ function segmentFromFlight(flight) {
     airline: flight.airline ?? '',
     fromCity: flight.fromCity ?? '',
     toCity: flight.toCity ?? '',
+    stopCount: flight.stopCount ?? 0,
     distanceKm: String(flight.distanceKm ?? ''),
     price: flight.price != null && flight.price !== '' ? String(Math.round(flight.price)) : '',
     departureDate: flight.departureDate ?? '',
@@ -527,22 +533,6 @@ function SegmentForm({
         </Field>
 
         <Field
-          id={fieldId('distanceKm')}
-          label="Route Distance (km)"
-          icon={Ruler}
-          error={err('distanceKm')}
-        >
-          <input
-            {...input('distanceKm', {
-              type: 'number',
-              placeholder: 'Select both cities',
-              readOnly: true,
-              tabIndex: -1,
-            })}
-          />
-        </Field>
-
-        <Field
           id={fieldId('airline')}
           label="Airline"
           icon={Plane}
@@ -730,7 +720,7 @@ export default function AvailableCreation() {
     ) {
       list[index] = recalculateSegment(list[index]);
 
-      if (routeFields.includes(name) && (!list[index].price || list[index].price === '')) {
+      if (routeFields.includes(name)) {
         const autoFare = calculateEconomyFare(list[index].distanceKm);
         if (autoFare) {
           list[index].price = String(autoFare);
@@ -1353,11 +1343,8 @@ export default function AvailableCreation() {
                     </td>
 
                     <td>
-                      {flight.fromCity} → {flight.toCity}
+                      <div>{flight.fromCity} → {flight.toCity}</div>
                     </td>
-
-               
-               
 
                     <td>{flight.departureDate || '—'}</td>
 
@@ -1432,13 +1419,7 @@ export default function AvailableCreation() {
             </table>
           </div>
         )}
-
-        {flights.length > 10 && !flightListLoading && (
-          <p className="ac-hint">
-            Showing the 10 newest flights. Older flights are not
-            displayed in this list.
-          </p>
-        )}
+        
       </section>
 
       {/* -------------------- Delete Confirmation -------------------- */}
@@ -1497,11 +1478,7 @@ export default function AvailableCreation() {
           </div>
         </div>
       )}
-
-      <p className="ac-note">
-        Every flight gets its own FlightId from SQL Server. The form
-        submits to <code>POST /api/flights/itinerary</code>.
-      </p>
+     
     </div>
   );
 }

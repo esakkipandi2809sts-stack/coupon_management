@@ -947,7 +947,7 @@
   overflow: hidden;
 }
 .plane-nose, .plane-tail { text-align: center; font-size: 12px; color: #64748b; }
-.plane-nose { padding: 52px 0 10px; }
+.plane-nose { padding: 25px 0 10px; }
 .plane-tail { padding-top: 10px; }
 
 .plane-cols, .seat-row { display: flex; align-items: center; justify-content: center; gap: 10px; }

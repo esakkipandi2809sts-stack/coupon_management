@@ -2,7 +2,7 @@ namespace FlightBookingBackend.Services
 {
     public static class FlightFareCalculator
     {
-        public const decimal FarePerKilometer = 10m;
+        public const decimal FarePerKilometer = 4m;
         public const decimal MinimumEconomyFare = 1500m;
 
         public static decimal CalculateBaseFare(decimal distanceKm, string? flightClass)
@@ -26,7 +26,6 @@ namespace FlightBookingBackend.Services
             {
                 return CalculateEconomyFare(distanceKm.Value);
             }
-
             return 0m;
         }
 

@@ -206,7 +206,7 @@ public class BookingCouponWorkflowTests
         await context.Database.EnsureCreatedAsync();
 
         var user = CreateUser();
-        var flight = CreateFlight(1000m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(4));
+        var flight = CreateFlight(2500m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(4));
         context.AddRange(user, flight);
         await context.SaveChangesAsync();
 
@@ -262,8 +262,8 @@ public class BookingCouponWorkflowTests
         await context.Database.EnsureCreatedAsync();
 
         var user = CreateUser();
-        var sourceFlight = CreateFlight(1000m, DateOnly.FromDateTime(DateTime.UtcNow));
-        var redemptionFlight = CreateFlight(200m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(4));
+        var sourceFlight = CreateFlight(2500m, DateOnly.FromDateTime(DateTime.UtcNow));
+        var redemptionFlight = CreateFlight(500m, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(4));
         context.AddRange(user, sourceFlight, redemptionFlight);
         await context.SaveChangesAsync();
 

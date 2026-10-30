@@ -13,6 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import { calculateClassFare, formatINR, getClassMultiplier } from '../utils/flightPricing';
+import { getFlightDetails } from '../utils/flightRoute';
 import './FlightCard.css';
 
 function getFlightDate(dateValue) {
@@ -89,13 +90,12 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
   const fareAvailable = Number.isFinite(fare) && fare > 0;
   const canBook = Number(flight.availableSeats) >= Math.max(1, Number(passengerCount) || 1) && fareAvailable;
   const schedule = getSchedule(flight);
+  const flightDetails = getFlightDetails(flight);
   const logoUrl = flight.airlineLogoUrl || flight.logoUrl || '';
   const departureLocation = formatAirport(flight.fromAirportCode, flight.fromCity);
   const arrivalLocation = formatAirport(flight.toAirportCode, flight.toCity);
   const dateDifference = schedule.dayOffset > 0 ? `+${schedule.dayOffset} day${schedule.dayOffset === 1 ? '' : 's'}` : '';
-  const stopsLabel = Number.isInteger(flight.stopCount)
-    ? flight.stopCount === 0 ? 'Non-stop' : `${flight.stopCount} stop${flight.stopCount === 1 ? '' : 's'}`
-    : 'Stops not provided';
+  const stopsLabel = flightDetails.flightType;
 
   const handleSelect = () => {
     if (!canBook) return;
@@ -142,14 +142,14 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
       <section className="flight-ticket-route" aria-label="Flight duration and stops">
         <span className="flight-ticket-duration">
           <Clock3 size={13} />
-          {schedule.duration}
+          {flightDetails.duration}
         </span>
         <div className="flight-ticket-route-line">
           <span />
           <Plane size={15} />
           <span />
         </div>
-        <span className={`flight-ticket-stops${Number.isInteger(flight.stopCount) ? '' : ' flight-ticket-stops-unavailable'}`}>
+        <span className="flight-ticket-stops">
           {stopsLabel}
         </span>
       </section>
@@ -226,6 +226,12 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
 
       {openPanel === 'details' && (
         <div className="flight-ticket-expanded">
+          <div><span>From City</span><strong>{flightDetails.fromCity}</strong></div>
+          <div><span>To City</span><strong>{flightDetails.toCity}</strong></div>
+          <div><span>Distance</span><strong>{flightDetails.distanceDisplay}</strong></div>
+          <div><span>Stop Count</span><strong>{flightDetails.stopCount}</strong></div>
+          <div><span>Flight Type</span><strong>{flightDetails.flightType}</strong></div>
+          <div><span>Duration</span><strong>{flightDetails.duration}</strong></div>
           <div><span>Airline</span><strong>{flight.airline}</strong></div>
           <div><span>Flight number</span><strong>{flight.flightNumber}</strong></div>
           {flight.bookingDate && (
@@ -233,8 +239,6 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
           )}
           <div><span>Departure</span><strong>{departureLocation} · {formatTime(flight.departureTime)}</strong></div>
           <div><span>Arrival</span><strong>{arrivalLocation} · {formatTime(flight.arrivalTime)}</strong></div>
-          <div><span>Duration</span><strong>{schedule.duration}</strong></div>
-          <div><span>Stops</span><strong>{stopsLabel}</strong></div>
           {flight.baggageAllowance && (
             <div><span>Baggage allowance</span><strong>{flight.baggageAllowance}</strong></div>
           )}

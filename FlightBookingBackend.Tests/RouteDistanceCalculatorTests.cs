@@ -11,7 +11,10 @@ public class RouteDistanceCalculatorTests
         var distance = RouteDistanceCalculator.TryCalculate("Chennai", "Bengaluru");
 
         Assert.NotNull(distance);
-        Assert.InRange(distance!.Value, 300m, 340m);
+        Assert.InRange(distance!.Value, 280m, 340m);
+
+        var chennaiDelhi = RouteDistanceCalculator.TryCalculate("Chennai", "Delhi");
+        Assert.Equal(1760m, chennaiDelhi);
     }
 
     [Fact]
