@@ -510,7 +510,7 @@ namespace FlightBookingBackend.Services
                 ExpiryDate = now.AddYears(1),
                 TotalUsageLimit = 1,
                 UsedCount = 0,
-                Status = "Pending",
+                Status = "Available",
                 CreatedAt = now,
                 UserId = userId,
                 Username = username,

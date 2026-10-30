@@ -466,55 +466,6 @@ export default function FlightBooking() {
     return getCouponCode(c).includes(couponCode.toUpperCase());
   });
 
-  /* ---------- create coupon from points ---------- */
-
-  const handleCreateCoupon = async () => {
-    setCouponError('');
-    setCouponSuccess('');
-
-    if (pointsToRedeem === '' || !validPointsInput || parsedPoints <= 0) {
-      setCouponError('Please enter the points you want to convert into a coupon.');
-      return;
-    }
-
-    if (parsedPoints < 10) {
-      setCouponError('Minimum 10 points are required to create a coupon (10 points = ₹1).');
-      return;
-    }
-
-    if (parsedPoints > availableCouponPoints) {
-      setCouponError(
-        `Insufficient points. You have ${availableCouponPoints} available points, but entered ${parsedPoints} points.`
-      );
-      return;
-    }
-
-    setCreatingCoupon(true);
-
-    try {
-      const response = await couponApi.createFromPoints(parsedPoints);
-      const data = response.data;
-      const createdCode = data?.couponCode || data?.code;
-
-      if (!createdCode) {
-        throw new Error('The server did not return a coupon code.');
-      }
-
-      setPointsToRedeem('');
-      setCouponCode('');
-      setCouponSuccess(
-        `Coupon ${String(createdCode).toUpperCase()} created successfully! ${parsedPoints} points deducted. Enter or select the code above and click Apply.`
-      );
-
-      await loadCouponBalance();
-      await loadPassengerCoupons();
-    } catch (err) {
-      setCouponError(err.response?.data?.message || err.message || 'Failed to create coupon.');
-    } finally {
-      setCreatingCoupon(false);
-    }
-  };
-
   /* ---------- apply / remove coupon ---------- */
 
   const handleApplyCoupon = async codeToApply => {
@@ -576,6 +527,62 @@ export default function FlightBooking() {
     setCouponCode('');
     setCouponSuccess('');
     setCouponError('');
+  };
+
+  /* ---------- create coupon from points ---------- */
+
+  const handleCreateCoupon = async () => {
+    setCouponError('');
+    setCouponSuccess('');
+
+    if (pointsToRedeem === '' || !validPointsInput || parsedPoints <= 0) {
+      setCouponError('Please enter the points you want to convert into a coupon.');
+      return;
+    }
+
+    if (parsedPoints < 10) {
+      setCouponError('Minimum 10 points are required to create a coupon (10 points = ₹1).');
+      return;
+    }
+
+    if (parsedPoints > availableCouponPoints) {
+      setCouponError(
+        `Insufficient points. You have ${availableCouponPoints} available points, but entered ${parsedPoints} points.`
+      );
+      return;
+    }
+
+    setCreatingCoupon(true);
+
+    try {
+      const response = await couponApi.createFromPoints(parsedPoints);
+      const data = response.data;
+      const createdCode = data?.couponCode || data?.code;
+
+      if (!createdCode) {
+        throw new Error('The server did not return a coupon code.');
+      }
+
+      const formattedCode = String(createdCode).toUpperCase();
+      setPointsToRedeem('');
+      setCouponCode('');
+
+      await loadCouponBalance();
+      await loadPassengerCoupons();
+
+      // Automatically apply the coupon so the discount immediately shows in "Total coupon discount"
+      if (flightId) {
+        await handleApplyCoupon(formattedCode);
+      } else {
+        setCouponSuccess(
+          `Coupon ${formattedCode} created successfully! ${parsedPoints} points deducted.`
+        );
+      }
+    } catch (err) {
+      setCouponError(err.response?.data?.message || err.message || 'Failed to create coupon.');
+    } finally {
+      setCreatingCoupon(false);
+    }
   };
 
   /* ---------- confirm booking ---------- */
@@ -816,48 +823,6 @@ export default function FlightBooking() {
                     </div>
                   </div>
 
-                  <div style={{
-                    marginTop: 14,
-                    padding: '14px 16px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 12
-                  }}>
-                    <h3 style={{ margin: '0 0 10px 0', fontSize: '0.92rem', color: '#0f172a' }}>
-                      Flight Details
-                    </h3>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                      gap: 12,
-                      fontSize: '0.82rem'
-                    }}>
-                      <div>
-                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>From City:</span>
-                        <strong>{flightDetails.fromCity}</strong>
-                      </div>
-                      <div>
-                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>To City:</span>
-                        <strong>{flightDetails.toCity}</strong>
-                      </div>
-                      <div>
-                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Distance:</span>
-                        <strong>{flightDetails.distanceDisplay}</strong>
-                      </div>
-                      <div>
-                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Stop Count:</span>
-                        <strong>{flightDetails.stopCount}</strong>
-                      </div>
-                      <div>
-                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Flight Type:</span>
-                        <strong>{flightDetails.flightType}</strong>
-                      </div>
-                      <div>
-                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Duration:</span>
-                        <strong>{flightDetails.duration}</strong>
-                      </div>
-                    </div>
-                  </div>
                 </>
               );
             })()}
