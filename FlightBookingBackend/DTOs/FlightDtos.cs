@@ -60,6 +60,9 @@ namespace FlightBookingBackend.DTOs
         [Range(typeof(decimal), "0.01", "99999999.99")]
         public decimal DistanceKm { get; set; }
 
+        [Range(typeof(decimal), "1", "99999999.99", ErrorMessage = "Price must be a positive number.")]
+        public decimal? Price { get; set; }
+
         [Required, StringLength(50, MinimumLength = 1)]
         public string FlightNumber { get; set; } = string.Empty;
         [Required, StringLength(100, MinimumLength = 1)]

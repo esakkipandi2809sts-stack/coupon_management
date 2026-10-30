@@ -6,7 +6,9 @@ namespace FlightBookingBackend.DTOs
     {
         public int CouponId { get; set; }
         public int? UserId { get; set; }
+        public string? Username { get; set; }
         public string? OwnerUsername { get; set; }
+        public string? PassengerName { get; set; }
         public string CouponCode { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string DiscountType { get; set; } = string.Empty;
@@ -64,6 +66,18 @@ namespace FlightBookingBackend.DTOs
         public int UsedCoupons { get; set; }
         public int ExpiredCoupons { get; set; }
         public int TotalCoupons { get; set; }
+    }
+
+    public class UserCouponCountDto
+    {
+        public int UserId { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public int AvailableCoupons { get; set; }
+        public int PendingCoupons { get; set; }
+        public int ExpiredCoupons { get; set; }
+        public int UsedCoupons { get; set; }
+        public int TotalCoupons { get; set; }
+        public DateTime LastUpdatedAt { get; set; }
     }
 
     public class CouponEligibilityDto

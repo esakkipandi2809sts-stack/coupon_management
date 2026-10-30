@@ -365,8 +365,10 @@ namespace FlightBookingBackend.Services
                         DistanceKm = distanceKm.Value,
                         TotalSeats = dto.TotalSeats,
                         AvailableSeats = dto.AvailableSeats,
-                        // Single shared fare formula (distance x rate, with minimum) used everywhere.
-                        Price = FlightFareCalculator.CalculateBaseFare(distanceKm.Value, "Economy"),
+                        // Use manually entered price if provided, otherwise compute from route distance.
+                        Price = dto.Price is > 0m
+                            ? Math.Round(dto.Price.Value, 0, MidpointRounding.AwayFromZero)
+                            : FlightFareCalculator.CalculateBaseFare(distanceKm.Value, "Economy"),
                         Status = string.IsNullOrWhiteSpace(dto.Status) ? "Scheduled" : dto.Status.Trim(),
                         CreatedByUserName = username,
                         TripType = tripType,
@@ -474,7 +476,9 @@ namespace FlightBookingBackend.Services
             flight.Duration = dto.Duration.Trim();
             flight.TotalSeats = dto.TotalSeats;
             flight.AvailableSeats = dto.AvailableSeats;
-            flight.Price = FlightFareCalculator.CalculateBaseFare(dto.DistanceKm, "Economy");
+            flight.Price = dto.Price is > 0m
+                ? Math.Round(dto.Price.Value, 0, MidpointRounding.AwayFromZero)
+                : FlightFareCalculator.CalculateBaseFare(dto.DistanceKm, "Economy");
             flight.Status = string.IsNullOrWhiteSpace(dto.Status) ? flight.Status : dto.Status.Trim();
 
             await _context.SaveChangesAsync();

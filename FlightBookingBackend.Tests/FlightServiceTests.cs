@@ -446,6 +446,52 @@ public class FlightServiceTests
         Assert.Equal(departureDate, updated.DepartureDate);
     }
 
+    [Fact]
+    public async Task CreateFlightWithManualPricePersistsCustomFare()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<FlightBookingDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var context = new FlightBookingDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+
+        var request = new CreateFlightDto
+        {
+            FlightNumber = "AI-777",
+            Airline = "Air India",
+            FromCity = "Chennai",
+            ToCity = "Delhi",
+            DepartureDate = new DateOnly(2026, 11, 15),
+            DepartureTime = "08:00",
+            ArrivalDate = new DateOnly(2026, 11, 15),
+            ArrivalTime = "10:30",
+            Duration = "2h 30m",
+            DistanceKm = 1750m,
+            Price = 6450m,
+            TotalSeats = 180,
+            AvailableSeats = 180,
+            Status = "Scheduled"
+        };
+        var service = new FlightService(context);
+        var created = await service.CreateFlightAsync(request);
+
+        Assert.NotNull(created);
+        Assert.Equal(6450m, created.Price);
+        var persistedFlight = await context.Flights.FindAsync(created.FlightId);
+        Assert.NotNull(persistedFlight);
+        Assert.Equal(6450m, persistedFlight.Price);
+
+        // Update with another price
+        request.Price = 7200m;
+        var updated = await service.UpdateFlightAsync(created.FlightId, request);
+        Assert.NotNull(updated);
+        Assert.Equal(7200m, updated.Price);
+        await context.Entry(persistedFlight).ReloadAsync();
+        Assert.Equal(7200m, persistedFlight.Price);
+    }
+
     private static Flight CreateFlight(string flightNumber) => new()
     {
         FlightNumber = flightNumber,

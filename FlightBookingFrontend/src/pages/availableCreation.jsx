@@ -16,6 +16,7 @@ import {
   Ruler,
   Trash2,
   Pencil,
+  IndianRupee,
 } from 'lucide-react';
 
 import { flightApi } from '../services/api';
@@ -72,6 +73,7 @@ const emptySegment = (overrides = {}) => ({
   fromCity: '',
   toCity: '',
   distanceKm: '',  
+  price: '',
   departureDate: '',
   departureTime: '',
   arrivalDate: '',
@@ -96,8 +98,11 @@ const initialSegmentsByType = () => ({
 
 const errorKey = (segment, field) => `${segment.key}.${field}`;
 
-const segmentFare = (segment) =>
-  calculateEconomyFare(segment.distanceKm);
+const segmentFare = (segment) => {
+  const p = parseFloat(segment?.price);
+  if (!Number.isNaN(p) && p > 0) return Math.round(p);
+  return calculateEconomyFare(segment?.distanceKm);
+};
 
 function segmentLabel(tripType, index) {
   if (tripType === 'RoundTrip') {
@@ -112,12 +117,14 @@ function segmentLabel(tripType, index) {
 }
 
 function toPayload(segment) {
+  const priceVal = parseFloat(segment.price);
   return {
     flightNumber: segment.flightNumber.trim(),
     airline: segment.airline.trim(),
     fromCity: segment.fromCity.trim(),
     toCity: segment.toCity.trim(),
     distanceKm: parseFloat(segment.distanceKm),
+    price: !Number.isNaN(priceVal) && priceVal > 0 ? Math.round(priceVal) : undefined,
     departureDate: segment.departureDate,
     departureTime: segment.departureTime,
     arrivalDate: segment.arrivalDate,
@@ -136,7 +143,7 @@ function segmentFromFlight(flight) {
     fromCity: flight.fromCity ?? '',
     toCity: flight.toCity ?? '',
     distanceKm: String(flight.distanceKm ?? ''),
-    
+    price: flight.price != null && flight.price !== '' ? String(Math.round(flight.price)) : '',
     departureDate: flight.departureDate ?? '',
     departureTime: flight.departureTime ?? '',
     arrivalDate: flight.arrivalDate ?? '',
@@ -201,6 +208,13 @@ function validateSegment(segment, today) {
 
   const total = parseInt(segment.totalSeats, 10);
   const available = parseInt(segment.availableSeats, 10);
+  const priceVal = parseFloat(segment.price);
+
+  if (segment.price === '' || segment.price === undefined || segment.price === null) {
+    errs.price = 'Flight Price is required.';
+  } else if (Number.isNaN(priceVal) || priceVal <= 0) {
+    errs.price = 'Flight Price must be a positive number.';
+  }
 
   if (segment.totalSeats === '') {
     errs.totalSeats = 'Total Seats is required.';
@@ -557,6 +571,24 @@ function SegmentForm({
         </Field>
 
         <Field
+          id={fieldId('price')}
+          label="Price (₹)"
+          icon={IndianRupee}
+          error={err('price')}
+        >
+          <input
+            {...input('price', {
+              type: 'number',
+              min: 1,
+              step: 'any',
+              placeholder: segment.distanceKm
+                ? `e.g. ${calculateEconomyFare(segment.distanceKm) || 3500}`
+                : 'e.g. 3500',
+            })}
+          />
+        </Field>
+
+        <Field
           id={fieldId('totalSeats')}
           label="Total Seats"
           icon={Users}
@@ -697,12 +729,20 @@ export default function AvailableCreation() {
       timingFields.includes(name)
     ) {
       list[index] = recalculateSegment(list[index]);
+
+      if (routeFields.includes(name) && (!list[index].price || list[index].price === '')) {
+        const autoFare = calculateEconomyFare(list[index].distanceKm);
+        if (autoFare) {
+          list[index].price = String(autoFare);
+        }
+      }
     }
 
     clearErrorsFor(list[index], [
       name,
       'distanceKm',
       'arrivalDate',
+      ...(name === 'price' ? ['price'] : []),
       ...(routeFields.includes(name) ? routeFields : []),
     ]);
 
@@ -717,6 +757,11 @@ export default function AvailableCreation() {
         fromCity: list[0].toCity,
         toCity: list[0].fromCity,
       });
+
+      if (!list[1].price || list[1].price === '') {
+        const retFare = calculateEconomyFare(list[1].distanceKm);
+        if (retFare) list[1].price = String(retFare);
+      }
 
       clearErrorsFor(list[1], [
         'fromCity',
@@ -958,9 +1003,10 @@ export default function AvailableCreation() {
   const totalFare =
     tripType === 'OneWay'
       ? null
-      : calculateItineraryFare(
-          segments.map((segment) => segment.distanceKm)
-        );
+      : segments.reduce((sum, seg) => {
+          const f = segmentFare(seg);
+          return sum !== null && f !== null ? sum + f : null;
+        }, 0);
 
   const errorList = Object.values(errors);
 

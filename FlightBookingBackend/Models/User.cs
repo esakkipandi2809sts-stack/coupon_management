@@ -38,7 +38,14 @@ namespace FlightBookingBackend.Models
 
         public bool IsActive { get; set; } = true;
 
+        public int AvailableCoupons { get; set; } = 0;
+        public int PendingCoupons { get; set; } = 0;
+        public int ExpiredCoupons { get; set; } = 0;
+        public int UsedCoupons { get; set; } = 0;
+        public int TotalCoupons { get; set; } = 0;
+
         // Navigation properties
+        public virtual UserCouponCount? CouponCount { get; set; }
         public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
         public virtual ICollection<CouponUsage> CouponUsages { get; set; } = new List<CouponUsage>();
     }

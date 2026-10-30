@@ -214,7 +214,7 @@ namespace FlightBookingBackend.Services
                 return (false, "New password must differ from the current password.");
             }
 
-            user.PasswordHash = dto.NewPassword;
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
             await _context.SaveChangesAsync();
             return (true, "Password changed successfully.");
         }

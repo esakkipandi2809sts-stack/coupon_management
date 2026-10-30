@@ -26,6 +26,7 @@ GO
 
 IF OBJECT_ID(N'dbo.CouponUsage', N'U') IS NOT NULL DROP TABLE dbo.CouponUsage;
 IF OBJECT_ID(N'dbo.CouponTransactions', N'U') IS NOT NULL DROP TABLE dbo.CouponTransactions;
+IF OBJECT_ID(N'dbo.UserCouponCounts', N'U') IS NOT NULL DROP TABLE dbo.UserCouponCounts;
 IF OBJECT_ID(N'dbo.Coupons', N'U') IS NOT NULL DROP TABLE dbo.Coupons;
 IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL DROP TABLE dbo.Bookings;
 IF OBJECT_ID(N'dbo.Flights', N'U') IS NOT NULL DROP TABLE dbo.Flights;
@@ -43,6 +44,11 @@ CREATE TABLE dbo.Users (
     PhoneNumber NVARCHAR(30) NOT NULL,
     PasswordHash NVARCHAR(255) NOT NULL,
     Role NVARCHAR(20) NOT NULL CONSTRAINT DF_Users_Role DEFAULT N'User',
+    AvailableCoupons INT NOT NULL CONSTRAINT DF_Users_AvailableCoupons DEFAULT 0,
+    PendingCoupons INT NOT NULL CONSTRAINT DF_Users_PendingCoupons DEFAULT 0,
+    ExpiredCoupons INT NOT NULL CONSTRAINT DF_Users_ExpiredCoupons DEFAULT 0,
+    UsedCoupons INT NOT NULL CONSTRAINT DF_Users_UsedCoupons DEFAULT 0,
+    TotalCoupons INT NOT NULL CONSTRAINT DF_Users_TotalCoupons DEFAULT 0,
     CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_Users_CreatedAt DEFAULT SYSUTCDATETIME(),
     IsActive BIT NOT NULL CONSTRAINT DF_Users_IsActive DEFAULT 1,
     CONSTRAINT PK_Users PRIMARY KEY CLUSTERED (Id ASC),
@@ -99,6 +105,7 @@ GO
 CREATE TABLE dbo.Coupons (
     CouponId INT IDENTITY(1,1) NOT NULL,
     CouponCode VARCHAR(8) NOT NULL,
+    PassengerName NVARCHAR(150) NULL,
     LegacyCouponCode NVARCHAR(8) NULL,
     Description NVARCHAR(255) NOT NULL,
     DiscountType NVARCHAR(20) NOT NULL,            -- 'Percentage' or 'Fixed'
@@ -115,6 +122,7 @@ CREATE TABLE dbo.Coupons (
     Status NVARCHAR(50) NOT NULL CONSTRAINT DF_Coupons_Status DEFAULT N'Available', -- Pending | Available | Used | Expired
     CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_Coupons_CreatedAt DEFAULT SYSUTCDATETIME(),
     UserId INT NULL,
+    Username NVARCHAR(150) NULL,
     GeneratedForBookingId INT NULL,
     JourneyDate DATE NULL,
     AvailableFromDate DATE NULL,
@@ -130,6 +138,29 @@ CREATE TABLE dbo.Coupons (
 );
 GO
 CREATE NONCLUSTERED INDEX IX_Coupons_Status_AvailableFromDate ON dbo.Coupons (Status, AvailableFromDate);
+GO
+CREATE NONCLUSTERED INDEX IX_Coupons_Username ON dbo.Coupons (Username);
+GO
+
+-- ----------------------------------------------------------------------------
+-- UserCouponCounts
+-- ----------------------------------------------------------------------------
+CREATE TABLE dbo.UserCouponCounts (
+    Id INT IDENTITY(1,1) NOT NULL,
+    UserId INT NOT NULL,
+    Username NVARCHAR(150) NOT NULL,
+    AvailableCoupons INT NOT NULL CONSTRAINT DF_UserCouponCounts_Available DEFAULT 0,
+    PendingCoupons INT NOT NULL CONSTRAINT DF_UserCouponCounts_Pending DEFAULT 0,
+    ExpiredCoupons INT NOT NULL CONSTRAINT DF_UserCouponCounts_Expired DEFAULT 0,
+    UsedCoupons INT NOT NULL CONSTRAINT DF_UserCouponCounts_Used DEFAULT 0,
+    TotalCoupons INT NOT NULL CONSTRAINT DF_UserCouponCounts_Total DEFAULT 0,
+    LastUpdatedAt DATETIME2 NOT NULL CONSTRAINT DF_UserCouponCounts_LastUpdatedAt DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_UserCouponCounts PRIMARY KEY CLUSTERED (Id ASC),
+    CONSTRAINT UQ_UserCouponCounts_UserId UNIQUE NONCLUSTERED (UserId ASC),
+    CONSTRAINT FK_UserCouponCounts_Users FOREIGN KEY (UserId) REFERENCES dbo.Users (Id) ON DELETE CASCADE
+);
+GO
+CREATE NONCLUSTERED INDEX IX_UserCouponCounts_Username ON dbo.UserCouponCounts (Username);
 GO
 
 -- ----------------------------------------------------------------------------

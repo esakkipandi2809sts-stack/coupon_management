@@ -150,6 +150,10 @@ export const couponApi = {
 
   createFromPoints: (points) =>
     api.post('/coupons/create-from-points', { points }),
+
+  getMyCount: () => api.get('/coupons/my-count'),
+
+  getUserCounts: () => api.get('/coupons/user-counts'),
 };
 
 // Dashboard APIs

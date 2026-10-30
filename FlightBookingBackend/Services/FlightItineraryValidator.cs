@@ -97,6 +97,8 @@ namespace FlightBookingBackend.Services
                 return "Available seats cannot be negative.";
             if (dto.AvailableSeats > dto.TotalSeats)
                 return "Available seats cannot exceed total seats.";
+            if (dto.Price.HasValue && dto.Price.Value <= 0m)
+                return "Price must be a positive number.";
             return null;
         }
 

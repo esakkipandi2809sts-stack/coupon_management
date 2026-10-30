@@ -19,6 +19,7 @@ namespace FlightBookingBackend.Data
         public DbSet<Coupon> Coupons { get; set; } = null!;
         public DbSet<CouponUsage> CouponUsages { get; set; } = null!;
         public DbSet<CouponTransaction> CouponTransactions { get; set; } = null!;
+        public DbSet<UserCouponCount> UserCouponCounts { get; set; } = null!;
 
         // Coupon percentage rules table
         public DbSet<CouponPercentageRule> CouponPercentageRules
@@ -38,6 +39,11 @@ namespace FlightBookingBackend.Data
                 entity.HasIndex(e => e.Email).IsUnique();
                 entity.HasIndex(e => e.Username).IsUnique();
                 entity.Property(e => e.Role).HasDefaultValue("User");
+                entity.Property(e => e.AvailableCoupons).HasDefaultValue(0);
+                entity.Property(e => e.PendingCoupons).HasDefaultValue(0);
+                entity.Property(e => e.ExpiredCoupons).HasDefaultValue(0);
+                entity.Property(e => e.UsedCoupons).HasDefaultValue(0);
+                entity.Property(e => e.TotalCoupons).HasDefaultValue(0);
                 entity.ToTable(table => table.HasCheckConstraint(
                     "CK_Users_Role", "[Role] IN ('Admin', 'User')"));
             });
@@ -71,6 +77,8 @@ namespace FlightBookingBackend.Data
                 entity.HasKey(e => e.CouponId);
                 entity.Property(e => e.CouponCode).IsUnicode(false).HasMaxLength(8).IsRequired();
                 entity.Property(e => e.LegacyCouponCode).HasMaxLength(50);
+                entity.Property(e => e.Username).HasMaxLength(150);
+                entity.Property(e => e.PassengerName).HasMaxLength(150);
                 entity.HasIndex(e => e.CouponCode)
                     .IsUnique()
                     .HasDatabaseName("UX_Coupons_CouponCode");
@@ -200,6 +208,25 @@ namespace FlightBookingBackend.Data
                     x.AirlineName,
                     x.CabinClass
                 }).IsUnique();
+            });
+
+            // UserCouponCount configuration
+            modelBuilder.Entity<UserCouponCount>(entity =>
+            {
+                entity.ToTable("UserCouponCounts");
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.UserId).IsUnique().HasDatabaseName("UX_UserCouponCounts_UserId");
+                entity.HasIndex(e => e.Username).HasDatabaseName("IX_UserCouponCounts_Username");
+                entity.Property(e => e.Username).HasMaxLength(150).IsRequired();
+                entity.Property(e => e.AvailableCoupons).HasDefaultValue(0);
+                entity.Property(e => e.PendingCoupons).HasDefaultValue(0);
+                entity.Property(e => e.ExpiredCoupons).HasDefaultValue(0);
+                entity.Property(e => e.UsedCoupons).HasDefaultValue(0);
+                entity.Property(e => e.TotalCoupons).HasDefaultValue(0);
+                entity.HasOne(e => e.User)
+                    .WithOne(u => u.CouponCount)
+                    .HasForeignKey<UserCouponCount>(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }

@@ -14,6 +14,9 @@ namespace FlightBookingBackend.Data
             // 1. Seed demo users so the quick login flow works even when other users already exist.
             EnsureSeedUsers(context);
 
+            // 2. Ensure every user has a UserCouponCount record and accurate counts in database.
+            EnsureUserCouponCounts(context);
+
             // Flights are created through the authenticated flight management API.
         }
 
@@ -297,6 +300,9 @@ IF OBJECT_ID(N'dbo.Coupons', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Coupons', N'
 IF OBJECT_ID(N'dbo.Coupons', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Coupons', N'CouponPoints') IS NULL
     ALTER TABLE dbo.Coupons ADD CouponPoints DECIMAL(18,4) NOT NULL
         CONSTRAINT DF_Coupons_CouponPoints DEFAULT 0 WITH VALUES;
+IF OBJECT_ID(N'dbo.Coupons', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Coupons', N'DiscountType') IS NULL
+    ALTER TABLE dbo.Coupons ADD DiscountType NVARCHAR(20) NOT NULL
+        CONSTRAINT DF_Coupons_DiscountType DEFAULT N'Percentage' WITH VALUES;
 
 IF OBJECT_ID(N'dbo.Coupons', N'U') IS NOT NULL
    AND EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Coupons_DiscountValue' AND parent_object_id = OBJECT_ID(N'dbo.Coupons'))
@@ -621,6 +627,128 @@ BEGIN
       AND t.Status <> N'Available';
 END;
 ");
+
+            context.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Coupons', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Coupons', N'Username') IS NULL
+    ALTER TABLE dbo.Coupons ADD Username NVARCHAR(150) NULL;
+IF OBJECT_ID(N'dbo.Coupons', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Coupons', N'PassengerName') IS NULL
+    ALTER TABLE dbo.Coupons ADD PassengerName NVARCHAR(150) NULL;
+
+IF OBJECT_ID(N'dbo.Users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Users', N'AvailableCoupons') IS NULL
+    ALTER TABLE dbo.Users ADD AvailableCoupons INT NOT NULL CONSTRAINT DF_Users_AvailableCoupons DEFAULT 0 WITH VALUES;
+IF OBJECT_ID(N'dbo.Users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Users', N'PendingCoupons') IS NULL
+    ALTER TABLE dbo.Users ADD PendingCoupons INT NOT NULL CONSTRAINT DF_Users_PendingCoupons DEFAULT 0 WITH VALUES;
+IF OBJECT_ID(N'dbo.Users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Users', N'ExpiredCoupons') IS NULL
+    ALTER TABLE dbo.Users ADD ExpiredCoupons INT NOT NULL CONSTRAINT DF_Users_ExpiredCoupons DEFAULT 0 WITH VALUES;
+IF OBJECT_ID(N'dbo.Users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Users', N'UsedCoupons') IS NULL
+    ALTER TABLE dbo.Users ADD UsedCoupons INT NOT NULL CONSTRAINT DF_Users_UsedCoupons DEFAULT 0 WITH VALUES;
+IF OBJECT_ID(N'dbo.Users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Users', N'TotalCoupons') IS NULL
+    ALTER TABLE dbo.Users ADD TotalCoupons INT NOT NULL CONSTRAINT DF_Users_TotalCoupons DEFAULT 0 WITH VALUES;
+
+IF OBJECT_ID(N'dbo.UserCouponCounts', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.UserCouponCounts (
+        Id INT IDENTITY(1,1) NOT NULL,
+        UserId INT NOT NULL,
+        Username NVARCHAR(150) NOT NULL,
+        AvailableCoupons INT NOT NULL CONSTRAINT DF_UserCouponCounts_Available DEFAULT 0,
+        PendingCoupons INT NOT NULL CONSTRAINT DF_UserCouponCounts_Pending DEFAULT 0,
+        ExpiredCoupons INT NOT NULL CONSTRAINT DF_UserCouponCounts_Expired DEFAULT 0,
+        UsedCoupons INT NOT NULL CONSTRAINT DF_UserCouponCounts_Used DEFAULT 0,
+        TotalCoupons INT NOT NULL CONSTRAINT DF_UserCouponCounts_Total DEFAULT 0,
+        LastUpdatedAt DATETIME2 NOT NULL CONSTRAINT DF_UserCouponCounts_LastUpdatedAt DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT PK_UserCouponCounts PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT UQ_UserCouponCounts_UserId UNIQUE NONCLUSTERED (UserId ASC),
+        CONSTRAINT FK_UserCouponCounts_Users FOREIGN KEY (UserId) REFERENCES dbo.Users (Id) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX IX_UserCouponCounts_Username ON dbo.UserCouponCounts (Username);
+END;
+");
+
+            context.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Coupons', N'U') IS NOT NULL 
+   AND OBJECT_ID(N'dbo.Users', N'U') IS NOT NULL 
+   AND COL_LENGTH(N'dbo.Coupons', N'Username') IS NOT NULL
+BEGIN
+    EXEC sp_executesql N'UPDATE c SET c.Username = u.Username FROM dbo.Coupons c INNER JOIN dbo.Users u ON c.UserId = u.Id WHERE c.Username IS NULL OR c.Username = ''''';
+END;
+");
+        }
+
+        private static void EnsureUserCouponCounts(FlightBookingDbContext context)
+        {
+            var users = context.Users.ToList();
+            if (!users.Any()) return;
+
+            var userIds = users.Select(u => u.Id).ToList();
+            var coupons = context.Coupons
+                .Where(c => c.UserId != null &&
+                            userIds.Contains(c.UserId.Value) &&
+                            c.Status != "Cancelled" &&
+                            (c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled))
+                .ToList();
+
+            // Backfill Username on Coupons if missing
+            var userMap = users.ToDictionary(u => u.Id);
+            foreach (var c in coupons)
+            {
+                if (string.IsNullOrEmpty(c.Username) && c.UserId.HasValue && userMap.TryGetValue(c.UserId.Value, out var u))
+                {
+                    c.Username = u.Username;
+                }
+            }
+
+            var existingCounts = context.UserCouponCounts
+                .Where(ucc => userIds.Contains(ucc.UserId))
+                .ToDictionary(ucc => ucc.UserId);
+
+            var now = DateTime.UtcNow;
+
+            foreach (var user in users)
+            {
+                var userCoupons = coupons.Where(c => c.UserId == user.Id).ToList();
+                var available = userCoupons.Count(c => c.Status == "Available");
+                var pending = userCoupons.Count(c => c.Status == "Pending");
+                var used = userCoupons.Count(c => c.Status == "Used");
+                var expired = userCoupons.Count(c => c.Status == "Expired" || c.Status == "Inactive");
+                var total = available + pending + used + expired;
+
+                user.AvailableCoupons = available;
+                user.PendingCoupons = pending;
+                user.ExpiredCoupons = expired;
+                user.UsedCoupons = used;
+                user.TotalCoupons = total;
+
+                if (existingCounts.TryGetValue(user.Id, out var countRecord))
+                {
+                    countRecord.Username = user.Username;
+                    countRecord.AvailableCoupons = available;
+                    countRecord.PendingCoupons = pending;
+                    countRecord.ExpiredCoupons = expired;
+                    countRecord.UsedCoupons = used;
+                    countRecord.TotalCoupons = total;
+                    countRecord.LastUpdatedAt = now;
+                }
+                else
+                {
+                    context.UserCouponCounts.Add(new UserCouponCount
+                    {
+                        UserId = user.Id,
+                        Username = user.Username,
+                        AvailableCoupons = available,
+                        PendingCoupons = pending,
+                        ExpiredCoupons = expired,
+                        UsedCoupons = used,
+                        TotalCoupons = total,
+                        LastUpdatedAt = now
+                    });
+                }
+            }
+
+            if (context.ChangeTracker.HasChanges())
+            {
+                context.SaveChanges();
+            }
         }
     }
 }

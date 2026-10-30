@@ -273,6 +273,8 @@ namespace FlightBookingBackend.Services
                         Status = initialCouponStatus,
                         CreatedAt = now,
                         UserId = userId,
+                        Username = user.Username,
+                        PassengerName = booking.PassengerName,
                         GeneratedForBookingId = booking.BookingId,
                         JourneyDate = journeyDate,
                         AvailableFromDate = journeyDate,
@@ -318,25 +320,27 @@ namespace FlightBookingBackend.Services
                 if (appliedCoupon != null)
                 {
                     var businessDate = _couponService.GetBusinessDate();
-                    var couponClaimed = await _context.Coupons
-                        .Where(c => c.CouponId == appliedCoupon.CouponId &&
-                                    c.UserId == userId &&
-                                    c.Status == "Available" &&
-                                    c.UsedCount == 0 &&
-                                    c.ExpiryDate > DateTime.UtcNow &&
-                                    c.GeneratedForBooking != null &&
-                                    c.GeneratedForBooking.Flight != null &&
-                                    c.GeneratedForBooking.Flight.DepartureDate <= businessDate &&
-                                    !c.CouponUsages.Any())
-                        .ExecuteUpdateAsync(updates => updates
-                            .SetProperty(c => c.UsedCount, c => c.UsedCount + 1)
-                            .SetProperty(c => c.Status, "Used"));
+                    var couponToClaim = await _context.Coupons
+                        .Include(c => c.GeneratedForBooking)
+                            .ThenInclude(b => b!.Flight)
+                        .Include(c => c.CouponUsages)
+                        .FirstOrDefaultAsync(c => c.CouponId == appliedCoupon.CouponId &&
+                                                  c.UserId == userId &&
+                                                  c.Status == "Available" &&
+                                                  c.UsedCount == 0 &&
+                                                  c.ExpiryDate > DateTime.UtcNow &&
+                                                  (c.GeneratedForBooking == null ||
+                                                   (c.GeneratedForBooking.Flight != null && c.GeneratedForBooking.Flight.DepartureDate <= businessDate)) &&
+                                                  !c.CouponUsages.Any());
 
-                    if (couponClaimed != 1)
+                    if (couponToClaim == null)
                     {
                         await transaction.RollbackAsync();
                         return (false, "This coupon is no longer available. Refresh your coupons and try again.", null);
                     }
+
+                    couponToClaim.UsedCount += 1;
+                    couponToClaim.Status = "Used";
 
                     var couponUsage = new CouponUsage
                     {
@@ -352,6 +356,7 @@ namespace FlightBookingBackend.Services
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+                await _couponService.UpdateUserCouponCountsAsync(userId);
 
                 var detailDto = new BookingDetailDto
                 {
@@ -635,6 +640,7 @@ namespace FlightBookingBackend.Services
             await _context.SaveChangesAsync();
             await _couponService.GetCouponBalanceAsync(booking.UserId);
             await transaction.CommitAsync();
+            await _couponService.UpdateUserCouponCountsAsync(booking.UserId);
             return (true, "Ticket cancelled successfully. Booking status updated to Cancelled.");
         }
 
@@ -700,11 +706,10 @@ namespace FlightBookingBackend.Services
                 return (false, "Choose a different flight to reschedule to.", null);
             }
 
-            if (!string.Equals(newFlight.FromCity, currentFlight.FromCity, StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(newFlight.ToCity, currentFlight.ToCity, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(newFlight.FromCity.Trim(), newFlight.ToCity.Trim(), StringComparison.OrdinalIgnoreCase))
             {
                 await transaction.RollbackAsync();
-                return (false, "You can only reschedule to another flight on the same route.", null);
+                return (false, "Origin and destination must be different cities.", null);
             }
 
             if (!string.Equals(newFlight.Status, "Scheduled", StringComparison.OrdinalIgnoreCase) ||
@@ -714,10 +719,10 @@ namespace FlightBookingBackend.Services
                 return (false, "The selected flight is not open for booking.", null);
             }
 
-            if (newFlight.AvailableSeats <= 0)
+            if (newFlight.AvailableSeats < booking.PassengerCount)
             {
                 await transaction.RollbackAsync();
-                return (false, "No available seats on the selected flight.", null);
+                return (false, $"Only {newFlight.AvailableSeats} seat(s) available on the selected flight.", null);
             }
 
             var seatTaken = await _context.Bookings.AnyAsync(b =>
@@ -732,15 +737,44 @@ namespace FlightBookingBackend.Services
                 return (false, "This seat has already been booked for the selected flight.", null);
             }
 
-            // Move the seat from the old flight to the new one. The fare is unchanged because the route is the same.
+            // Calculate new fare for the chosen flight, preserving passenger count and class multiplier.
+            var newBaseEconomyFare = newFlight.Price > 0m
+                ? newFlight.Price
+                : FlightFareCalculator.ResolveBaseFare(newFlight.DistanceKm);
+            var newFarePerPassenger = (int)Math.Round(FlightFareCalculator.CalculateClassFare(newBaseEconomyFare, booking.Class), 0, MidpointRounding.AwayFromZero);
+            var newTotalBaseFare = (int)Math.Round(newFarePerPassenger * (decimal)booking.PassengerCount, 0, MidpointRounding.AwayFromZero);
+            var discount = booking.DiscountAmount;
+            var newTicketPrice = Math.Max(0, newTotalBaseFare - (int)discount);
+
+            // Move the seat from the old flight to the new one.
             currentFlight.AvailableSeats += booking.PassengerCount;
             newFlight.AvailableSeats -= booking.PassengerCount;
 
             booking.Flight = newFlight;
             booking.FlightId = newFlight.FlightId;
             booking.FlightJourneyDate = newFlight.DepartureDate;
+            booking.DistanceKm = newFlight.DistanceKm;
+            booking.BaseFare = newTotalBaseFare;
+            booking.TicketPrice = newTicketPrice;
             booking.SeatNumber = seatNumber;
             booking.BookingStatus = BookingStatuses.Rescheduled;
+
+            if (!string.IsNullOrWhiteSpace(booking.PassengerDetails))
+            {
+                try
+                {
+                    var passengersList = JsonSerializer.Deserialize<List<PassengerDto>>(booking.PassengerDetails);
+                    if (passengersList != null && passengersList.Count > 0)
+                    {
+                        passengersList[0].Seat = seatNumber;
+                        booking.PassengerDetails = JsonSerializer.Serialize(passengersList);
+                    }
+                }
+                catch
+                {
+                    // Ignore legacy serialization anomalies
+                }
+            }
 
             // The reward coupon unlocks on the journey date, so keep it in step with the new flight date.
             var rewardCoupon = await _context.Coupons

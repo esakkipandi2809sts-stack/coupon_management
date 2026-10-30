@@ -14,6 +14,7 @@ import {
   UserRound,
   Armchair,
   IndianRupee,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { bookingApi, flightApi } from '../services/api';
 import BookingTable from '../components/BookingTable';
@@ -48,6 +49,17 @@ const formatDisplayDate = (dateVal) => {
     year: 'numeric',
   });
 };
+
+const FALLBACK_CITIES = [
+  'Ahmedabad', 'Amritsar', 'Bengaluru', 'Bhopal', 'Bhubaneswar',
+  'Chandigarh', 'Chennai', 'Coimbatore', 'Dehradun', 'Delhi',
+  'Goa', 'Guwahati', 'Hyderabad', 'Indore', 'Jaipur',
+  'Jammu', 'Kochi', 'Kolkata', 'Lucknow', 'Ludhiana',
+  'Madurai', 'Mangalore', 'Mumbai', 'Mysuru', 'Nagpur',
+  'Patna', 'Pondicherry', 'Prayagraj', 'Pune', 'Raipur',
+  'Ranchi', 'Surat', 'Thiruvananthapuram', 'Tiruchirappalli', 'Udaipur',
+  'Vadodara', 'Varanasi', 'Vijayawada', 'Visakhapatnam'
+];
 
 const BASE_FLIGHT_SEATS = [
   '11A', '11B', '12A', '12B', '13A', '13B', '14A', '14B',
@@ -84,6 +96,9 @@ export default function MyBookings() {
 
   // Reschedule dialog state
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
+  const [rescheduleFromCity, setRescheduleFromCity] = useState('');
+  const [rescheduleToCity, setRescheduleToCity] = useState('');
+  const [cityOptions, setCityOptions] = useState(FALLBACK_CITIES);
   const [flightOptions, setFlightOptions] = useState([]);
   const [flightOptionsLoading, setFlightOptionsLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayIso());
@@ -99,9 +114,10 @@ export default function MyBookings() {
     setErrorMessage('');
 
     try {
-      const [bookingsRes, flightsRes] = await Promise.allSettled([
+      const [bookingsRes, flightsRes, citiesRes] = await Promise.allSettled([
         bookingApi.getMyBookings(),
         flightApi.getAll(),
+        flightApi.getCities(),
       ]);
 
       if (bookingsRes.status !== 'fulfilled') {
@@ -112,6 +128,16 @@ export default function MyBookings() {
         flightsRes.status === 'fulfilled' && Array.isArray(flightsRes.value?.data)
           ? flightsRes.value.data
           : [];
+
+      const apiCities =
+        citiesRes.status === 'fulfilled' && Array.isArray(citiesRes.value?.data)
+          ? citiesRes.value.data
+          : [];
+      const flightCities = flights.flatMap((f) => [f.fromCity, f.toCity]).filter(Boolean);
+      const combinedCities = Array.from(new Set([...apiCities, ...flightCities, ...FALLBACK_CITIES]))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+      setCityOptions(combinedCities);
       const flightMap = new Map(flights.map((f) => [String(f.flightId), f]));
 
       const rawBookings = Array.isArray(bookingsRes.value?.data)
@@ -209,6 +235,8 @@ export default function MyBookings() {
     if (rescheduling) return;
 
     setRescheduleTarget(null);
+    setRescheduleFromCity('');
+    setRescheduleToCity('');
     setFlightOptions([]);
     setSelectedDate(todayIso());
     setSelectedFlightId('');
@@ -218,16 +246,32 @@ export default function MyBookings() {
     setLoadingBookedSeats(false);
   };
 
-  const loadFlightsForDate = async (booking, targetDate) => {
-    if (!booking || !targetDate) return;
+  const loadFlightsForDate = async (booking, targetDate, fromCity = null, toCity = null) => {
+    if (!booking) return;
+
+    const from = (fromCity ?? rescheduleFromCity ?? booking.fromCity ?? '').trim();
+    const to = (toCity ?? rescheduleToCity ?? booking.toCity ?? '').trim();
+
+    if (!from || !to) {
+      setFlightOptions([]);
+      setSelectedFlightId('');
+      return;
+    }
+
+    if (from.toLowerCase() === to.toLowerCase()) {
+      setFlightOptions([]);
+      setSelectedFlightId('');
+      setRescheduleError('From City and To City must be different.');
+      return;
+    }
 
     setFlightOptionsLoading(true);
     setRescheduleError('');
 
     try {
       const [routeRes, dateRes] = await Promise.allSettled([
-        flightApi.getByRoute(booking.fromCity, booking.toCity),
-        flightApi.searchByRoute(booking.fromCity, booking.toCity, targetDate),
+        flightApi.getByRoute(from, to),
+        targetDate ? flightApi.searchByRoute(from, to, targetDate) : Promise.resolve({ data: [] }),
       ]);
 
       const routeFlights =
@@ -246,11 +290,12 @@ export default function MyBookings() {
       });
 
       const today = todayIso();
+      const passengerCount = Number(booking.passengerCount) || 1;
       const availableFlights = Array.from(flightMap.values())
         .filter(
           (flight) =>
             String(flight.flightId) !== String(booking.flightId) &&
-            Number(flight.availableSeats) > 0 &&
+            Number(flight.availableSeats) >= passengerCount &&
             (!flight.status ||
               ['scheduled', 'available', 'active'].includes(
                 String(flight.status).toLowerCase()
@@ -285,10 +330,40 @@ export default function MyBookings() {
       console.error('Failed to load reschedule flights for date:', err);
       setRescheduleError(
         err.response?.data?.message ||
-          'Unable to load flights for the selected date.'
+          'Unable to load flights for the selected route and date.'
       );
     } finally {
       setFlightOptionsLoading(false);
+    }
+  };
+
+  const handleFromCityChange = (newFrom) => {
+    setRescheduleFromCity(newFrom);
+    setSelectedFlightId('');
+    setRescheduleSeat('');
+    if (rescheduleTarget && selectedDate) {
+      loadFlightsForDate(rescheduleTarget, selectedDate, newFrom, rescheduleToCity);
+    }
+  };
+
+  const handleToCityChange = (newTo) => {
+    setRescheduleToCity(newTo);
+    setSelectedFlightId('');
+    setRescheduleSeat('');
+    if (rescheduleTarget && selectedDate) {
+      loadFlightsForDate(rescheduleTarget, selectedDate, rescheduleFromCity, newTo);
+    }
+  };
+
+  const handleSwapCities = () => {
+    const prevFrom = rescheduleFromCity;
+    const prevTo = rescheduleToCity;
+    setRescheduleFromCity(prevTo);
+    setRescheduleToCity(prevFrom);
+    setSelectedFlightId('');
+    setRescheduleSeat('');
+    if (rescheduleTarget && selectedDate) {
+      loadFlightsForDate(rescheduleTarget, selectedDate, prevTo, prevFrom);
     }
   };
 
@@ -299,7 +374,12 @@ export default function MyBookings() {
     }
     if (!booking) return;
 
+    const initialFrom = booking.fromCity || '';
+    const initialTo = booking.toCity || '';
+
     setRescheduleTarget(booking);
+    setRescheduleFromCity(initialFrom);
+    setRescheduleToCity(initialTo);
     setSelectedFlightId('');
     setRescheduleSeat(booking.seatNumber || '');
     setRescheduleError('');
@@ -311,7 +391,7 @@ export default function MyBookings() {
     const initialDate = bookingDateStr >= todayIso() ? bookingDateStr : todayIso();
     setSelectedDate(initialDate);
 
-    await loadFlightsForDate(booking, initialDate);
+    await loadFlightsForDate(booking, initialDate, initialFrom, initialTo);
   };
 
   const flightsForSelectedDate = useMemo(
@@ -757,11 +837,11 @@ export default function MyBookings() {
             style={{
               width: '100%',
               maxWidth: '720px',
-              maxHeight: '85vh',
+              maxHeight: '70vh',
               overflowY: 'auto',
               backgroundColor: '#ffffff',
               borderRadius: '20px',
-              padding: '24px',
+              padding: '20px',
               boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
               boxSizing: 'border-box',
               margin: 'auto',
@@ -1168,11 +1248,11 @@ export default function MyBookings() {
             <div style={{ marginTop: '22px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <CalendarCheck size={18} color="#7c3aed" />
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-                Select New Travel Date & Flight
+                Select New Route, Travel Date & Flight
               </h3>
             </div>
             <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-              Choose a new travel date and flight for {rescheduleTarget.fromCity} → {rescheduleTarget.toCity}. Fare remains the same because the route is unchanged.
+              Modify your departure city, destination, travel date, and choose an available flight.
             </p>
 
             {/* Reschedule Error */}
@@ -1197,16 +1277,120 @@ export default function MyBookings() {
               </div>
             )}
 
+            {/* Route Selection: From City & To City */}
+            <div
+              style={{
+                marginTop: '18px',
+                display: 'grid',
+                gridTemplateColumns: '1fr auto 1fr',
+                gap: '10px',
+                alignItems: 'flex-end',
+              }}
+            >
+              <div>
+                <label
+                  htmlFor="reschedule-from-city"
+                  style={{
+                    display: 'block',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    color: '#334155',
+                    marginBottom: '6px',
+                  }}
+                >
+                  From (Departure City)
+                </label>
+                <select
+                  id="reschedule-from-city"
+                  value={rescheduleFromCity}
+                  onChange={(e) => handleFromCityChange(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '11px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.9rem',
+                    color: '#0f172a',
+                    backgroundColor: '#ffffff',
+                    fontWeight: 600,
+                  }}
+                >
+                  {cityOptions.map((city) => (
+                    <option key={`from-${city}`} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSwapCities}
+                title="Swap departure and destination cities"
+                style={{
+                  padding: '10px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#f8fafc',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '42px',
+                  marginBottom: '1px',
+                }}
+              >
+                <ArrowLeftRight size={16} />
+              </button>
+
+              <div>
+                <label
+                  htmlFor="reschedule-to-city"
+                  style={{
+                    display: 'block',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    color: '#334155',
+                    marginBottom: '6px',
+                  }}
+                >
+                  To (Destination City)
+                </label>
+                <select
+                  id="reschedule-to-city"
+                  value={rescheduleToCity}
+                  onChange={(e) => handleToCityChange(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '11px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.9rem',
+                    color: '#0f172a',
+                    backgroundColor: '#ffffff',
+                    fontWeight: 600,
+                  }}
+                >
+                  {cityOptions.map((city) => (
+                    <option key={`to-${city}`} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {/* Travel Date */}
-            <div style={{ marginTop: '20px' }}>
+            <div style={{ marginTop: '16px' }}>
               <label
                 htmlFor="reschedule-date"
                 style={{
                   display: 'block',
-                  fontSize: '0.86rem',
-                  fontWeight: 800,
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
                   color: '#334155',
-                  marginBottom: '8px',
+                  marginBottom: '6px',
                 }}
               >
                 Choose your new travel date
@@ -1236,7 +1420,12 @@ export default function MyBookings() {
                     setSelectedFlightId('');
                     setRescheduleError('');
                     if (rescheduleTarget && newDate) {
-                      loadFlightsForDate(rescheduleTarget, newDate);
+                      loadFlightsForDate(
+                        rescheduleTarget,
+                        newDate,
+                        rescheduleFromCity,
+                        rescheduleToCity
+                      );
                     }
                   }}
                   style={{
@@ -1293,7 +1482,7 @@ export default function MyBookings() {
                   }}
                 >
                   <RefreshCw size={15} className="animate-spin" />
-                  Loading available flights for {formatDisplayDate(selectedDate)}...
+                  Loading available flights for {formatDisplayDate(selectedDate)} ({rescheduleFromCity} → {rescheduleToCity})...
                 </div>
               ) : flightOptions.length === 0 ? (
                 <p
@@ -1305,8 +1494,7 @@ export default function MyBookings() {
                     borderRadius: '12px',
                   }}
                 >
-                  No other upcoming flights with free seats are available on
-                  this route.
+                  No upcoming flights with free seats found for {rescheduleFromCity} → {rescheduleToCity}.
                 </p>
               ) : flightsForSelectedDate.length === 0 ? (
                 <p
@@ -1318,7 +1506,7 @@ export default function MyBookings() {
                     borderRadius: '12px',
                   }}
                 >
-                  No available flights on {formatDisplayDate(selectedDate)}. Please choose another
+                  No available flights on {formatDisplayDate(selectedDate)} for {rescheduleFromCity} → {rescheduleToCity}. Please choose another
                   date.
                 </p>
               ) : (
@@ -1403,7 +1591,17 @@ export default function MyBookings() {
                             }}
                           >
                             <Clock3 size={14} />
-                            {flight.departureTime} → {flight.arrivalTime}
+                            <span>{flight.departureTime} → {flight.arrivalTime}</span>
+                            <span style={{ margin: '0 4px', color: '#cbd5e1' }}>•</span>
+                            <span>{flight.fromCity} → {flight.toCity}</span>
+                            {flight.price != null && (
+                              <>
+                                <span style={{ margin: '0 4px', color: '#cbd5e1' }}>•</span>
+                                <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                                  {formatINR(flight.price)}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </label>
@@ -1476,7 +1674,9 @@ export default function MyBookings() {
                     marginBottom: 0,
                   }}
                 >
-                  The fare stays the same because the route is unchanged. Only unbooked seats can be selected.
+                  {rescheduleFromCity !== rescheduleTarget.fromCity || rescheduleToCity !== rescheduleTarget.toCity
+                    ? `Route changed to ${rescheduleFromCity} → ${rescheduleToCity}. Fare will adjust based on the new flight.`
+                    : 'The fare stays the same because the route is unchanged. Only unbooked seats can be selected.'}
                 </p>
               )}
             </div>

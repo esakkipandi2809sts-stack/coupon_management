@@ -62,6 +62,12 @@ namespace FlightBookingBackend.Models
 
         public int? UserId { get; set; }
 
+        [MaxLength(150)]
+        public string? Username { get; set; }
+
+        [MaxLength(150)]
+        public string? PassengerName { get; set; }
+
         public int? GeneratedForBookingId { get; set; }
 
         [Column(TypeName = "date")]

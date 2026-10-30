@@ -79,8 +79,7 @@ export default function CouponCard({ coupon, onApply }) {
           {getStatusBadge()}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-          <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
-            {formatINR(couponDiscountAmount)} OFF
+          <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>Coupon Value : {formatINR (couponDiscountAmount)} 
           </h4>
 
         </div>

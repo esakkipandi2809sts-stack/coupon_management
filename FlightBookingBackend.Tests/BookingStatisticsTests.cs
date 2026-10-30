@@ -162,7 +162,7 @@ public class BookingStatisticsTests
     }
 
     [Fact]
-    public async Task ReschedulingIsRejectedForOtherRoutesTakenSeatsAndInactiveBookings()
+    public async Task ReschedulingSupportsOtherRoutesAndRejectsTakenSeatsAndInactiveBookings()
     {
         await using var connection = await OpenDatabaseAsync();
         await using var context = CreateContext(connection);
@@ -174,6 +174,7 @@ public class BookingStatisticsTests
         var oldFlight = CreateFlight("TEST-100", today.AddDays(5));
         var sameRoute = CreateFlight("TEST-200", today.AddDays(9));
         var otherRoute = CreateFlight("TEST-300", today.AddDays(9));
+        otherRoute.FromCity = "Delhi";
         otherRoute.ToCity = "Mumbai";
         context.AddRange(user, other, oldFlight, sameRoute, otherRoute);
         await context.SaveChangesAsync();
@@ -185,23 +186,33 @@ public class BookingStatisticsTests
         Assert.True(theirs.Success, theirs.Message);
         var bookingId = mine.Booking!.BookingId;
 
-        var wrongRoute = await bookingService.RescheduleBookingAsync(
-            bookingId, user.Id, new RescheduleBookingDto { NewFlightId = otherRoute.FlightId, SeatNumber = "8A" });
-        Assert.False(wrongRoute.Success);
+        // Rescheduling to same flight is rejected
+        var sameFlight = await bookingService.RescheduleBookingAsync(
+            bookingId, user.Id, new RescheduleBookingDto { NewFlightId = oldFlight.FlightId, SeatNumber = "8A" });
+        Assert.False(sameFlight.Success);
 
+        // Rescheduling to taken seat is rejected
         var seatTaken = await bookingService.RescheduleBookingAsync(
             bookingId, user.Id, new RescheduleBookingDto { NewFlightId = sameRoute.FlightId, SeatNumber = "7A" });
         Assert.False(seatTaken.Success);
 
+        // Rescheduling by non-owner is rejected
         var notOwner = await bookingService.RescheduleBookingAsync(
             bookingId, other.Id, new RescheduleBookingDto { NewFlightId = sameRoute.FlightId, SeatNumber = "8A" });
         Assert.False(notOwner.Success);
 
-        Assert.Equal(BookingStatuses.Confirmed, (await context.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == bookingId)).BookingStatus);
+        // Rescheduling to a different route succeeds
+        var newRouteReschedule = await bookingService.RescheduleBookingAsync(
+            bookingId, user.Id, new RescheduleBookingDto { NewFlightId = otherRoute.FlightId, SeatNumber = "8A" });
+        Assert.True(newRouteReschedule.Success, newRouteReschedule.Message);
+        var updatedBooking = await context.Bookings.AsNoTracking().SingleAsync(b => b.BookingId == bookingId);
+        Assert.Equal(BookingStatuses.Rescheduled, updatedBooking.BookingStatus);
+        Assert.Equal(otherRoute.FlightId, updatedBooking.FlightId);
 
+        // Cancelled booking cannot be rescheduled
         await bookingService.CancelBookingAsync(bookingId, user.Id);
         var cancelledBooking = await bookingService.RescheduleBookingAsync(
-            bookingId, user.Id, new RescheduleBookingDto { NewFlightId = sameRoute.FlightId, SeatNumber = "8A" });
+            bookingId, user.Id, new RescheduleBookingDto { NewFlightId = sameRoute.FlightId, SeatNumber = "9A" });
         Assert.False(cancelledBooking.Success);
     }
 

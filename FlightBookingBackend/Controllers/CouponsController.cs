@@ -218,5 +218,45 @@ namespace FlightBookingBackend.Controllers
                 return StatusCode(500, new { message = "Error creating coupon from points." });
             }
         }
+
+        [Authorize]
+        [HttpGet("my-count")]
+        [HttpGet("user-count")]
+        public async Task<IActionResult> GetMyCouponCount()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new { message = "Invalid user context." });
+            }
+
+            try
+            {
+                var countDto = await _couponService.GetUserCouponCountAsync(userId);
+                return Ok(countDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching user coupon count for user {UserId}", userId);
+                return StatusCode(500, new { message = "Error fetching user coupon count." });
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet("admin/user-counts")]
+        [HttpGet("user-counts")]
+        public async Task<IActionResult> GetAllUserCouponCounts()
+        {
+            try
+            {
+                var counts = await _couponService.GetAllUserCouponCountsAsync();
+                return Ok(counts);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching all user coupon counts");
+                return StatusCode(500, new { message = "Error fetching user coupon counts." });
+            }
+        }
     }
 }

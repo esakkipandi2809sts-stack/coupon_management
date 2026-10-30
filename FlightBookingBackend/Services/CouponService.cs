@@ -68,10 +68,13 @@ namespace FlightBookingBackend.Services
             return coupons.Select(coupon =>
             {
                 var dto = MapToDto(coupon);
-                dto.OwnerUsername = coupon.UserId.HasValue &&
-                                    ownerNames.TryGetValue(coupon.UserId.Value, out var username)
-                    ? username
-                    : null;
+                var resolvedUsername = !string.IsNullOrWhiteSpace(coupon.Username)
+                    ? coupon.Username
+                    : (coupon.UserId.HasValue && ownerNames.TryGetValue(coupon.UserId.Value, out var username)
+                        ? username
+                        : null);
+                dto.Username = resolvedUsername;
+                dto.OwnerUsername = resolvedUsername;
                 return dto;
             });
         }
@@ -79,22 +82,15 @@ namespace FlightBookingBackend.Services
         public async Task<CouponStatisticsDto> GetCouponStatisticsAsync(int userId)
         {
             await RefreshStatusesAsync();
-            var coupons = _context.Coupons.Where(c => c.UserId == userId &&
-                                                      c.Status != "Cancelled" &&
-                                                      (c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled));
-            var availableCoupons = await coupons.CountAsync(c => c.Status == "Available");
-            var pendingCoupons = await coupons.CountAsync(c => c.Status == "Pending");
-            var usedCoupons = await coupons.CountAsync(c => c.Status == "Used");
-            var expiredCoupons = await coupons.CountAsync(c => c.Status == "Expired" || c.Status == "Inactive");
-            var totalCoupons = availableCoupons + pendingCoupons + usedCoupons + expiredCoupons;
+            var countDto = await UpdateUserCouponCountsAsync(userId);
 
             return new CouponStatisticsDto
             {
-                AvailableCoupons = availableCoupons,
-                PendingCoupons = pendingCoupons,
-                UsedCoupons = usedCoupons,
-                ExpiredCoupons = expiredCoupons,
-                TotalCoupons = totalCoupons
+                AvailableCoupons = countDto.AvailableCoupons,
+                PendingCoupons = countDto.PendingCoupons,
+                UsedCoupons = countDto.UsedCoupons,
+                ExpiredCoupons = countDto.ExpiredCoupons,
+                TotalCoupons = countDto.TotalCoupons
             };
         }
 
@@ -494,6 +490,10 @@ namespace FlightBookingBackend.Services
                 TransactionDate = now
             });
 
+            // Lookup username
+            var user = await _context.Users.FindAsync(userId);
+            var username = user?.Username ?? string.Empty;
+
             // Create the coupon
             var coupon = new Coupon
             {
@@ -513,10 +513,12 @@ namespace FlightBookingBackend.Services
                 Status = "Pending",
                 CreatedAt = now,
                 UserId = userId,
+                Username = username,
                 GeneratedForBookingId = null
             };
             _context.Coupons.Add(coupon);
             await _context.SaveChangesAsync();
+            await UpdateUserCouponCountsAsync(userId);
 
             return (true, "Coupon created successfully.", new CreateCouponFromPointsResultDto
             {
@@ -591,24 +593,255 @@ namespace FlightBookingBackend.Services
                 .ExecuteUpdateAsync(updates => updates.SetProperty(c => c.Status, "Expired"));
 
             // 6. Update pending to available
-            await _context.Coupons
+            var pendingCoupons = await _context.Coupons
                 .Where(c => c.Status == "Pending" &&
                             c.GeneratedForBooking != null &&
                             c.GeneratedForBooking.Flight != null &&
                             c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled &&
                             c.GeneratedForBooking.Flight.DepartureDate <= today &&
                             c.ExpiryDate > now)
-                .ExecuteUpdateAsync(updates => updates.SetProperty(c => c.Status, "Available"));
+                .ToListAsync();
+
+            if (pendingCoupons.Any())
+            {
+                foreach (var c in pendingCoupons)
+                {
+                    c.Status = "Available";
+                }
+                await _context.SaveChangesAsync();
+            }
 
             // 7. Update pending coupon transactions to available
-            await _context.CouponTransactions
+            var pendingTx = await _context.CouponTransactions
                 .Where(t => t.TransactionType == "Earned" &&
                             t.Status == "Pending" &&
                             t.Booking != null &&
                             t.Booking.Flight != null &&
                             t.Booking.BookingStatus != BookingStatuses.Cancelled &&
                             t.Booking.Flight.DepartureDate <= today)
-                .ExecuteUpdateAsync(updates => updates.SetProperty(t => t.Status, "Available"));
+                .ToListAsync();
+
+            if (pendingTx.Any())
+            {
+                foreach (var t in pendingTx)
+                {
+                    t.Status = "Available";
+                }
+                await _context.SaveChangesAsync();
+            }
+
+            // 8. Backfill coupon usernames if any are missing
+            var couponsWithoutUsername = await _context.Coupons
+                .Where(c => c.Username == null && c.UserId != null)
+                .ToListAsync();
+            if (couponsWithoutUsername.Any())
+            {
+                var ownerIds = couponsWithoutUsername.Select(c => c.UserId!.Value).Distinct().ToList();
+                var userNames = await _context.Users
+                    .Where(u => ownerIds.Contains(u.Id))
+                    .ToDictionaryAsync(u => u.Id, u => u.Username);
+                foreach (var c in couponsWithoutUsername)
+                {
+                    if (userNames.TryGetValue(c.UserId!.Value, out var uName))
+                    {
+                        c.Username = uName;
+                    }
+                }
+                await _context.SaveChangesAsync();
+            }
+
+            // 9. Automatically synchronize coupon counts for all users in database
+            await UpdateAllUserCouponCountsAsync();
+        }
+
+        public async Task<UserCouponCountDto> UpdateUserCouponCountsAsync(int userId)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null)
+            {
+                return new UserCouponCountDto { UserId = userId };
+            }
+
+            var coupons = _context.Coupons.Where(c => c.UserId == userId &&
+                                                      c.Status != "Cancelled" &&
+                                                      (c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled));
+
+            var availableCoupons = await coupons.CountAsync(c => c.Status == "Available");
+            var pendingCoupons = await coupons.CountAsync(c => c.Status == "Pending");
+            var usedCoupons = await coupons.CountAsync(c => c.Status == "Used");
+            var expiredCoupons = await coupons.CountAsync(c => c.Status == "Expired" || c.Status == "Inactive");
+            var totalCoupons = availableCoupons + pendingCoupons + usedCoupons + expiredCoupons;
+
+            // Update columns on Users table
+            user.AvailableCoupons = availableCoupons;
+            user.PendingCoupons = pendingCoupons;
+            user.ExpiredCoupons = expiredCoupons;
+            user.UsedCoupons = usedCoupons;
+            user.TotalCoupons = totalCoupons;
+
+            // Update or insert into UserCouponCounts table
+            var countRecord = await _context.UserCouponCounts.FirstOrDefaultAsync(ucc => ucc.UserId == userId);
+            var now = DateTime.UtcNow;
+            if (countRecord == null)
+            {
+                countRecord = new UserCouponCount
+                {
+                    UserId = userId,
+                    Username = user.Username,
+                    AvailableCoupons = availableCoupons,
+                    PendingCoupons = pendingCoupons,
+                    ExpiredCoupons = expiredCoupons,
+                    UsedCoupons = usedCoupons,
+                    TotalCoupons = totalCoupons,
+                    LastUpdatedAt = now
+                };
+                _context.UserCouponCounts.Add(countRecord);
+            }
+            else
+            {
+                countRecord.Username = user.Username;
+                countRecord.AvailableCoupons = availableCoupons;
+                countRecord.PendingCoupons = pendingCoupons;
+                countRecord.ExpiredCoupons = expiredCoupons;
+                countRecord.UsedCoupons = usedCoupons;
+                countRecord.TotalCoupons = totalCoupons;
+                countRecord.LastUpdatedAt = now;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return new UserCouponCountDto
+            {
+                UserId = userId,
+                Username = user.Username,
+                AvailableCoupons = availableCoupons,
+                PendingCoupons = pendingCoupons,
+                ExpiredCoupons = expiredCoupons,
+                UsedCoupons = usedCoupons,
+                TotalCoupons = totalCoupons,
+                LastUpdatedAt = now
+            };
+        }
+
+        public async Task UpdateAllUserCouponCountsAsync()
+        {
+            var users = await _context.Users
+                .Select(u => new { u.Id, u.Username })
+                .ToListAsync();
+
+            if (!users.Any()) return;
+
+            var userIds = users.Select(u => u.Id).ToList();
+
+            var activeCoupons = await _context.Coupons
+                .Where(c => c.UserId != null &&
+                            userIds.Contains(c.UserId.Value) &&
+                            c.Status != "Cancelled" &&
+                            (c.GeneratedForBooking == null || c.GeneratedForBooking.BookingStatus != BookingStatuses.Cancelled))
+                .Select(c => new { UserId = c.UserId!.Value, c.Status })
+                .ToListAsync();
+
+            var existingCounts = await _context.UserCouponCounts
+                .Where(ucc => userIds.Contains(ucc.UserId))
+                .ToDictionaryAsync(ucc => ucc.UserId);
+
+            var userEntities = await _context.Users
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id);
+
+            var now = DateTime.UtcNow;
+
+            foreach (var userInfo in users)
+            {
+                var userCoupons = activeCoupons.Where(c => c.UserId == userInfo.Id).ToList();
+                var available = userCoupons.Count(c => c.Status == "Available");
+                var pending = userCoupons.Count(c => c.Status == "Pending");
+                var used = userCoupons.Count(c => c.Status == "Used");
+                var expired = userCoupons.Count(c => c.Status == "Expired" || c.Status == "Inactive");
+                var total = available + pending + used + expired;
+
+                if (userEntities.TryGetValue(userInfo.Id, out var userEntity))
+                {
+                    userEntity.AvailableCoupons = available;
+                    userEntity.PendingCoupons = pending;
+                    userEntity.ExpiredCoupons = expired;
+                    userEntity.UsedCoupons = used;
+                    userEntity.TotalCoupons = total;
+                }
+
+                if (existingCounts.TryGetValue(userInfo.Id, out var countRecord))
+                {
+                    countRecord.Username = userInfo.Username;
+                    countRecord.AvailableCoupons = available;
+                    countRecord.PendingCoupons = pending;
+                    countRecord.ExpiredCoupons = expired;
+                    countRecord.UsedCoupons = used;
+                    countRecord.TotalCoupons = total;
+                    countRecord.LastUpdatedAt = now;
+                }
+                else
+                {
+                    _context.UserCouponCounts.Add(new UserCouponCount
+                    {
+                        UserId = userInfo.Id,
+                        Username = userInfo.Username,
+                        AvailableCoupons = available,
+                        PendingCoupons = pending,
+                        ExpiredCoupons = expired,
+                        UsedCoupons = used,
+                        TotalCoupons = total,
+                        LastUpdatedAt = now
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<UserCouponCountDto> GetUserCouponCountAsync(int userId)
+        {
+            var record = await _context.UserCouponCounts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.UserId == userId);
+
+            if (record != null)
+            {
+                return new UserCouponCountDto
+                {
+                    UserId = record.UserId,
+                    Username = record.Username,
+                    AvailableCoupons = record.AvailableCoupons,
+                    PendingCoupons = record.PendingCoupons,
+                    ExpiredCoupons = record.ExpiredCoupons,
+                    UsedCoupons = record.UsedCoupons,
+                    TotalCoupons = record.TotalCoupons,
+                    LastUpdatedAt = record.LastUpdatedAt
+                };
+            }
+
+            return await UpdateUserCouponCountsAsync(userId);
+        }
+
+        public async Task<IEnumerable<UserCouponCountDto>> GetAllUserCouponCountsAsync()
+        {
+            await RefreshStatusesAsync();
+
+            var records = await _context.UserCouponCounts
+                .AsNoTracking()
+                .OrderBy(c => c.Username)
+                .ToListAsync();
+
+            return records.Select(r => new UserCouponCountDto
+            {
+                UserId = r.UserId,
+                Username = r.Username,
+                AvailableCoupons = r.AvailableCoupons,
+                PendingCoupons = r.PendingCoupons,
+                ExpiredCoupons = r.ExpiredCoupons,
+                UsedCoupons = r.UsedCoupons,
+                TotalCoupons = r.TotalCoupons,
+                LastUpdatedAt = r.LastUpdatedAt
+            });
         }
 
         private Task<int> GetSuccessfulBookingCountAsync(int userId)
@@ -626,6 +859,9 @@ namespace FlightBookingBackend.Services
             {
                 CouponId = c.CouponId,
                 UserId = c.UserId,
+                Username = c.Username,
+                OwnerUsername = c.Username,
+                PassengerName = c.PassengerName ?? c.GeneratedForBooking?.PassengerName,
                 CouponCode = c.LegacyCouponCode ?? c.CouponCode,
                 Description = c.Description,
                 DiscountType = c.DiscountType,

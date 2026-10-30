@@ -8,6 +8,7 @@ import {
 import { bookingApi, couponApi, flightApi } from '../services/api';
 import { authUtil } from '../utils/auth';
 import { calculateClassFare, formatINR } from '../utils/flightPricing';
+import './Availability.css';
 
 const EMPTY_PASSENGER = {
   title: 'Mr',
@@ -22,13 +23,8 @@ const EMPTY_PASSENGER = {
   seat: ''
 };
 
-const SAMPLE_SEATS = [
-  '11A', '11B', '12A', '12B', '13A', '13B', '14A', '14B',
-  '15A', '15B', '16A', '16B', '17A', '17B', '18A', '18B',
-  '19A', '19B', '20A', '20B',
-];
-
 const PAYMENT_METHODS = ['Credit Card', 'Debit Card', 'UPI / NetBanking'];
+const TITLES = ['Mr', 'Mrs', 'Ms', 'Miss', 'Dr'];
 
 const styles = {
   card: {
@@ -49,6 +45,83 @@ const styles = {
     borderRadius: 10, fontSize: '0.85rem'
   }
 };
+
+const LEFT = ['A', 'B', 'C'];
+const RIGHT = ['D', 'E', 'F'];
+
+/* ---------------- SEAT MAP (named component, not a default export) ---------------- */
+
+function SeatMap({
+  bookedSeats = [],
+  selectedSeat = '',
+  onSelect = () => { },
+  startRow = 11,
+  endRow = 30,
+  exitRows = [],
+}) {
+  const booked = new Set(bookedSeats.map(s => String(s).toUpperCase()));
+  const rows = Array.from({ length: endRow - startRow + 1 }, (_, i) => startRow + i);
+
+  const renderSeat = (row, col) => {
+    const id = `${row}${col}`;
+    const isBooked = booked.has(id);
+    const isSelected = selectedSeat === id;
+    const cls = isBooked ? 'seat booked' : isSelected ? 'seat selected' : 'seat available';
+
+    return (
+      <button
+        key={id}
+        type="button"
+        className={cls}
+        disabled={isBooked}
+        aria-pressed={isSelected}
+        aria-label={`Seat ${id} ${isBooked ? 'booked' : isSelected ? 'selected' : 'available'}`}
+        title={`Seat ${id} is ${isBooked ? 'booked' : 'available'}`}
+        onClick={() => onSelect(id)}
+      >
+        {col}
+      </button>
+    );
+  };
+
+  return (
+    <div className="seatmap">
+      <div className="seatmap-legend">
+        <span><i className="dot available" /> Available</span>
+        <span><i className="dot selected" /> Selected</span>
+        <span><i className="dot booked" /> Booked</span>
+      </div>
+
+      <div className="plane">
+        <div className="plane-nose">Front</div>
+
+        <div className="plane-cols">
+          <div className="grp">{LEFT.map(c => <span key={c}>{c}</span>)}</div>
+          <div className="aisle" />
+          <div className="grp">{RIGHT.map(c => <span key={c}>{c}</span>)}</div>
+        </div>
+
+        <div className="plane-body">
+          {rows.map(row => (
+            <div key={row} className={`seat-row ${exitRows.includes(row) ? 'exit-row' : ''}`}>
+              <div className="grp">{LEFT.map(c => renderSeat(row, c))}</div>
+              <div className="aisle row-no">{row}</div>
+              <div className="grp">{RIGHT.map(c => renderSeat(row, c))}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="plane-tail">Rear</div>
+      </div>
+
+      <p className="seatmap-note">
+        {selectedSeat ? `Selected seat: ${selectedSeat}` : 'Tap a seat to pick or change.'}
+      </p>
+    </div>
+  );
+}
+
+/* ---------------- FORM FIELD ---------------- */
 
 function FormField({ label, value, onChange, error, type = 'text', placeholder = '', min, max, options }) {
   const inputStyle = { ...styles.input, borderColor: error ? '#ef4444' : '#cbd5e1' };
@@ -78,41 +151,38 @@ function FormField({ label, value, onChange, error, type = 'text', placeholder =
   );
 }
 
-const calculateAgeFromDob = (dobString) => {
+/* ---------------- HELPERS ---------------- */
+
+const calculateAgeFromDob = dobString => {
   if (!dobString) return '';
-  const parts = String(dobString).split('-');
-  if (parts.length !== 3) {
-    const d = new Date(dobString);
-    if (Number.isNaN(d.getTime())) return '';
-    const today = new Date();
-    let age = today.getFullYear() - d.getFullYear();
-    const m = today.getMonth() - d.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) {
-      age--;
-    }
-    return age >= 0 ? String(age) : '0';
-  }
-
-  const birthYear = parseInt(parts[0], 10);
-  const birthMonth = parseInt(parts[1], 10);
-  const birthDay = parseInt(parts[2], 10);
-
-  if (Number.isNaN(birthYear) || Number.isNaN(birthMonth) || Number.isNaN(birthDay)) {
-    return '';
-  }
+  const d = new Date(dobString);
+  if (Number.isNaN(d.getTime())) return '';
 
   const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1; // 1-indexed (1 to 12)
-  const currentDay = today.getDate();
-
-  let age = currentYear - birthYear;
-  if (currentMonth < birthMonth || (currentMonth === birthMonth && currentDay < birthDay)) {
-    age--;
-  }
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
 
   return age >= 0 ? String(age) : '0';
 };
+
+const getCouponCode = coupon => String(coupon?.couponCode || coupon?.code || '').trim().toUpperCase();
+
+const getDiscountText = c => {
+  if (c.discountPercentage) return `${c.discountPercentage}% OFF`;
+  if (c.discountAmount) return `₹${c.discountAmount} OFF`;
+  if (c.discountValue) {
+    return `${c.discountType === 'Percentage' ? `${c.discountValue}%` : `₹${c.discountValue}`} OFF`;
+  }
+  return '';
+};
+
+const makeRequestKey = () =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `booking-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+/* ---------------- MAIN COMPONENT ---------------- */
 
 export default function FlightBooking() {
   const location = useLocation();
@@ -120,6 +190,7 @@ export default function FlightBooking() {
   const user = authUtil.getUser();
 
   const flight = location.state?.flight || null;
+  const flightId = flight?.flightId || flight?.id;
   const selectedClass = location.state?.selectedClass || 'Economy';
 
   const passengerCount = Math.min(27, Math.max(1, Number(location.state?.passengerCount) || 1));
@@ -133,7 +204,6 @@ export default function FlightBooking() {
 
     return [{
       ...EMPTY_PASSENGER,
-      title: 'Mr',
       firstName: first,
       lastName: last,
       name: defaultName,
@@ -159,19 +229,15 @@ export default function FlightBooking() {
   const [couponBalance, setCouponBalance] = useState(null);
   const [couponBalanceError, setCouponBalanceError] = useState('');
 
-  // Create-coupon-from-points state
   const [creatingCoupon, setCreatingCoupon] = useState(false);
-  // Discount amount of the most recently created (but not yet applied) coupon
-  const [createdCouponDiscount, setCreatedCouponDiscount] = useState(0);
-
   // Points are only used to CREATE a coupon; the coupon is then applied via the code box.
   const [pointsToRedeem, setPointsToRedeem] = useState('');
 
-  const [bookedSeats, setBookedSeats] = useState(() => {
-    return Array.isArray(flight?.bookedSeats)
+  const [bookedSeats, setBookedSeats] = useState(() =>
+    Array.isArray(flight?.bookedSeats)
       ? flight.bookedSeats.map(s => String(s).trim().toUpperCase())
-      : [];
-  });
+      : []
+  );
 
   const [formErrors, setFormErrors] = useState({});
   const [bookingError, setBookingError] = useState('');
@@ -179,13 +245,11 @@ export default function FlightBooking() {
 
   const submittingRef = useRef(false);
   const bookingRequestKeyRef = useRef(null);
-
   if (!bookingRequestKeyRef.current) {
-    bookingRequestKeyRef.current =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `booking-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    bookingRequestKeyRef.current = makeRequestKey();
   }
+
+  /* ---------- data loading ---------- */
 
   const loadPassengerCoupons = useCallback(async () => {
     try {
@@ -213,7 +277,6 @@ export default function FlightBooking() {
   }, []);
 
   const loadBookedSeats = useCallback(async () => {
-    const flightId = flight?.flightId || flight?.id;
     if (!flightId) return;
     try {
       const response = await flightApi.getBookedSeats(flightId);
@@ -223,7 +286,7 @@ export default function FlightBooking() {
     } catch (err) {
       console.error('Failed to load booked seats for flight', err);
     }
-  }, [flight?.flightId, flight?.id]);
+  }, [flightId]);
 
   useEffect(() => {
     loadPassengerCoupons();
@@ -232,7 +295,7 @@ export default function FlightBooking() {
   }, [loadPassengerCoupons, loadCouponBalance, loadBookedSeats]);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = event => {
       if (couponDropdownRef.current && !couponDropdownRef.current.contains(event.target)) {
         setShowCouponDropdown(false);
       }
@@ -241,22 +304,24 @@ export default function FlightBooking() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  /* ---------- passengers ---------- */
+
   const updatePassenger = (index, field, value) => {
     setPassengers(previous =>
       previous.map((p, i) => {
         if (i !== index) return p;
         const updated = { ...p, [field]: value };
-        const first = field === 'firstName' ? value : (updated.firstName || '');
-        const last = field === 'lastName' ? value : (updated.lastName || '');
-        const combined = [first, last].filter(Boolean).join(' ').trim();
-        updated.name = combined || updated.name || '';
 
-        // Calculate the passenger's age automatically based on Date of Birth (DOB)
+        if (field === 'firstName' || field === 'lastName') {
+          updated.name = [updated.firstName, updated.lastName]
+            .map(part => (part || '').trim())
+            .filter(Boolean)
+            .join(' ');
+        }
+
         if (field === 'dob') {
           const autoAge = calculateAgeFromDob(value);
-          if (autoAge !== '') {
-            updated.age = autoAge;
-          }
+          if (autoAge !== '') updated.age = autoAge;
         }
 
         return updated;
@@ -264,14 +329,10 @@ export default function FlightBooking() {
     );
 
     setFormErrors(previous => {
-      const next = { ...previous };
-      if (next[index]) {
-        next[index] = { ...next[index] };
-        delete next[index][field];
-        if (field === 'dob') {
-          delete next[index].age;
-        }
-      }
+      if (!previous[index]) return previous;
+      const next = { ...previous, [index]: { ...previous[index] } };
+      delete next[index][field];
+      if (field === 'dob') delete next[index].age;
       return next;
     });
   };
@@ -306,13 +367,14 @@ export default function FlightBooking() {
     passengers.forEach((passenger, index) => {
       const err = {};
 
-      const fullName = (passenger.name || `${passenger.firstName || ''} ${passenger.lastName || ''}`).trim();
-      if (!passenger.firstName?.trim() && !fullName) {
-        err.firstName = 'First name is required.';
-      }
+      if (!passenger.title) err.title = 'Select a title.';
+      if (!passenger.firstName?.trim()) err.firstName = 'First name is required.';
+      if (!passenger.lastName?.trim()) err.lastName = 'Last name is required.';
 
-      if (!passenger.lastName?.trim() && !fullName) {
-        err.lastName = 'Last name is required.';
+      if (!passenger.dob) {
+        err.dob = 'Date of birth is required.';
+      } else if (new Date(passenger.dob) > new Date()) {
+        err.dob = 'Date of birth cannot be in the future.';
       }
 
       const email = (passenger.email || user?.email || '').trim();
@@ -337,11 +399,12 @@ export default function FlightBooking() {
         const seat = passenger.seat.trim().toUpperCase();
         if (bookedSeats.includes(seat)) {
           err.seat = `Seat ${seat} has already been booked. Please choose another seat.`;
-        } else {
-          const duplicateSeat = passengers.some((other, otherIndex) =>
+        } else if (
+          passengers.some((other, otherIndex) =>
             otherIndex !== index && other.seat?.trim().toUpperCase() === seat
-          );
-          if (duplicateSeat) err.seat = 'This seat is selected by another passenger.';
+          )
+        ) {
+          err.seat = 'This seat is selected by another passenger.';
         }
       }
 
@@ -357,7 +420,7 @@ export default function FlightBooking() {
     return true;
   };
 
-  // ---------------- FARE CALCULATION ----------------
+  /* ---------- fare calculation ---------- */
 
   const baseFarePerPassenger = Math.round(Number(flight?.price) || 0);
 
@@ -365,6 +428,7 @@ export default function FlightBooking() {
     ? calculateClassFare(baseFarePerPassenger, selectedClass)
     : null;
 
+  // Total fare for ALL passengers in the selected class
   const originalFare =
     classFarePerPassenger !== null && Number.isFinite(classFarePerPassenger)
       ? Math.round(classFarePerPassenger * passengerCount)
@@ -376,41 +440,34 @@ export default function FlightBooking() {
     (sum, coupon) => sum + Math.max(0, Number(coupon.discountAmount) || 0), 0
   );
 
-  // Discount from applied coupon codes, capped to baseFarePerPassenger
-  const discountAmount = Math.round(Math.min(
-    rawCouponDiscount,
-    baseFarePerPassenger
-  ));
+  // Only coupons that are actually APPLIED reduce the payable amount; capped to the total fare.
+  const totalDiscountAmount = fareAvailable
+    ? Math.round(Math.min(rawCouponDiscount, originalFare))
+    : 0;
+
+  const totalAmount = fareAvailable ? Math.max(0, originalFare - totalDiscountAmount) : 0;
 
   const availableCouponPoints = Math.max(0, Math.floor(Number(couponBalance?.availablePoints) || 0));
 
   const parsedPoints = pointsToRedeem === '' ? 0 : Number(pointsToRedeem);
   const validPointsInput = Number.isInteger(parsedPoints) && parsedPoints >= 0;
 
-  // 10 points = ₹1  (preview value shown before "Create Coupon" is clicked)
+  // 10 points = ₹1 (informational preview only; does NOT change the payable amount)
   const couponPreviewValue = validPointsInput && parsedPoints > 0 ? Math.floor(parsedPoints / 10) : 0;
 
-  // Combined discount: applied coupon codes + live points preview + created-but-not-yet-applied coupon
-  // Capped so it never exceeds the base fare
-  const totalDiscountAmount = Math.min(
-    discountAmount + couponPreviewValue + createdCouponDiscount,
-    baseFarePerPassenger
-  );
-
-  const remainingFare = Math.max(0, baseFarePerPassenger - totalDiscountAmount);
-
-  // Final Payable Amount = Base Fare per Passenger − Total Coupon Discount
-  const totalAmount = Math.max(0, baseFarePerPassenger - totalDiscountAmount);
-
-  // Available coupons not already applied (only one available coupon code displayed at a time)
   const unappliedPassengerCoupons = passengerCoupons.filter(coupon => {
-    const code = (coupon.couponCode || coupon.code || '').trim().toUpperCase();
+    const code = getCouponCode(coupon);
     const isAvailable = (coupon.status || 'Available').toLowerCase() === 'available';
-    return code && isAvailable && !appliedCoupons.some(c => (c.couponCode || c.code || '').trim().toUpperCase() === code);
+    return code && isAvailable && !appliedCoupons.some(c => getCouponCode(c) === code);
   });
   const displayedAvailableCoupons = unappliedPassengerCoupons.slice(0, 1);
 
-  // ---------------- CREATE COUPON FROM POINTS ----------------
+  const filteredDisplayedCoupons = displayedAvailableCoupons.filter(c => {
+    if (!couponCode) return true;
+    return getCouponCode(c).includes(couponCode.toUpperCase());
+  });
+
+  /* ---------- create coupon from points ---------- */
 
   const handleCreateCoupon = async () => {
     setCouponError('');
@@ -444,27 +501,22 @@ export default function FlightBooking() {
         throw new Error('The server did not return a coupon code.');
       }
 
-      // Leave the coupon input empty — the user must enter the code manually.
-      const discount = Math.floor(parsedPoints / 10);
       setPointsToRedeem('');
       setCouponCode('');
-      setCreatedCouponDiscount(discount);
       setCouponSuccess(
-        `Coupon ${String(createdCode).toUpperCase()} created successfully! ${parsedPoints} points deducted.`
+        `Coupon ${String(createdCode).toUpperCase()} created successfully! ${parsedPoints} points deducted. Enter or select the code above and click Apply.`
       );
 
       await loadCouponBalance();
       await loadPassengerCoupons();
     } catch (err) {
-      setCouponError(
-        err.response?.data?.message || err.message || 'Failed to create coupon.'
-      );
+      setCouponError(err.response?.data?.message || err.message || 'Failed to create coupon.');
     } finally {
       setCreatingCoupon(false);
     }
   };
 
-  // ---------------- APPLY COUPON ----------------
+  /* ---------- apply / remove coupon ---------- */
 
   const handleApplyCoupon = async codeToApply => {
     const code = String(codeToApply ?? couponCode).trim().toUpperCase();
@@ -474,12 +526,12 @@ export default function FlightBooking() {
       return;
     }
 
-    if (!flight?.flightId) {
+    if (!flightId) {
       setCouponError('Flight details are missing.');
       return;
     }
 
-    if (appliedCoupons.some(coupon => coupon.couponCode?.toUpperCase() === code)) {
+    if (appliedCoupons.some(coupon => getCouponCode(coupon) === code)) {
       setCouponError('This coupon is already applied.');
       return;
     }
@@ -489,19 +541,17 @@ export default function FlightBooking() {
     setCouponSuccess('');
 
     try {
-      const response = await couponApi.validate(code, flight.flightId, selectedClass, passengerCount);
+      const response = await couponApi.validate(code, flightId, selectedClass, passengerCount);
       const data = response.data;
 
       if (data?.isValid) {
         const validatedCoupon = { ...data, couponCode: data.couponCode || code };
 
         setAppliedCoupons(previous => {
-          if (previous.some(c => c.couponCode?.toUpperCase() === code)) return previous;
+          if (previous.some(c => getCouponCode(c) === code)) return previous;
           return [...previous, validatedCoupon];
         });
 
-        // The created coupon is now tracked via appliedCoupons; clear the separate preview.
-        setCreatedCouponDiscount(0);
         setPointsToRedeem('');
         setCouponCode('');
         setCouponSuccess(data.message || `${code} applied successfully.`);
@@ -518,7 +568,7 @@ export default function FlightBooking() {
   const handleRemoveCoupon = codeToRemove => {
     if (codeToRemove) {
       setAppliedCoupons(previous =>
-        previous.filter(c => c.couponCode?.toUpperCase() !== codeToRemove.toUpperCase())
+        previous.filter(c => getCouponCode(c) !== codeToRemove.toUpperCase())
       );
     } else {
       setAppliedCoupons([]);
@@ -527,10 +577,9 @@ export default function FlightBooking() {
     setCouponCode('');
     setCouponSuccess('');
     setCouponError('');
-    setCreatedCouponDiscount(0);
   };
 
-  // ---------------- CONFIRM BOOKING ----------------
+  /* ---------- confirm booking ---------- */
 
   const handleConfirmBooking = async event => {
     event.preventDefault();
@@ -539,7 +588,7 @@ export default function FlightBooking() {
 
     setBookingError('');
 
-    if (!flight?.flightId) {
+    if (!flightId) {
       setBookingError('Flight details are missing. Please select a flight again.');
       return;
     }
@@ -556,12 +605,14 @@ export default function FlightBooking() {
 
     try {
       const firstPassenger = passengers[0];
-      const primaryFullName = (firstPassenger.name || `${firstPassenger.firstName || ''} ${firstPassenger.lastName || ''}`).trim();
+      const primaryFullName = (
+        firstPassenger.name || `${firstPassenger.firstName} ${firstPassenger.lastName}`
+      ).trim();
       const primaryEmail = (firstPassenger.email || user?.email || '').trim();
 
       const payload = {
         idempotencyKey: bookingRequestKeyRef.current,
-        flightId: flight.flightId,
+        flightId,
         passengerName: primaryFullName,
         passengerEmail: primaryEmail,
         passengerPhone: (firstPassenger.phone || '').trim(),
@@ -582,7 +633,9 @@ export default function FlightBooking() {
         couponPointsToRedeem: 0,
 
         passengers: passengers.map(passenger => {
-          const fullName = (passenger.name || `${passenger.firstName || ''} ${passenger.lastName || ''}`).trim();
+          const fullName = (
+            passenger.name || `${passenger.firstName} ${passenger.lastName}`
+          ).trim();
           return {
             title: passenger.title || 'Mr',
             firstName: (passenger.firstName || '').trim(),
@@ -624,11 +677,7 @@ export default function FlightBooking() {
           'Booking succeeded, but coupon details could not be refreshed.';
       }
 
-      try {
-        await loadCouponBalance();
-      } catch {
-        // Do not block confirmation if the balance refresh fails.
-      }
+      await loadCouponBalance();
 
       navigate('/booking-confirmation', {
         state: { booking: confirmedBooking, couponPageData, couponRefreshError },
@@ -638,6 +687,16 @@ export default function FlightBooking() {
       console.error('Booking error:', err);
       console.error('Backend response:', err.response?.data);
 
+      // A rejected (4xx) request can be corrected and re-sent, so it needs a fresh key.
+      // Network/5xx errors keep the same key so a retry stays idempotent.
+      const status = err.response?.status;
+      if (status && status >= 400 && status < 500) {
+        bookingRequestKeyRef.current = makeRequestKey();
+      }
+
+      // Refresh seats in case someone else took one meanwhile.
+      loadBookedSeats();
+
       setBookingError(
         err.response?.data?.message || err.message || 'Booking failed. Please try again.'
       );
@@ -646,6 +705,8 @@ export default function FlightBooking() {
       setSubmitting(false);
     }
   };
+
+  /* ---------- render ---------- */
 
   if (!flight) {
     return (
@@ -662,7 +723,8 @@ export default function FlightBooking() {
 
   const pointsInputDisabled =
     appliedCoupons.length > 0 ||
-    remainingFare <= 0 ||
+    !fareAvailable ||
+    totalAmount <= 0 ||
     couponsLoading ||
     creatingCoupon;
 
@@ -682,50 +744,11 @@ export default function FlightBooking() {
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 14px;
         }
-        .booking-seat {
-          padding: 7px 11px;
-          border-radius: 8px;
-          border: 1px solid transparent;
-          font-weight: 600;
-          font-size: 0.85rem;
-          transition: all 0.15s ease-in-out;
-        }
-        .booking-seat-available {
-          border-color: #cbd5e1;
-          background: #ffffff;
-          color: #1e293b;
-          cursor: pointer;
-        }
-        .booking-seat-available:hover {
-          border-color: #0284c7;
-          background: #f0f9ff;
-          color: #0284c7;
-        }
-        .booking-seat-selected {
-          border-color: #0284c7;
-          background: #0284c7;
-          color: #ffffff;
-          box-shadow: 0 2px 4px rgba(2, 132, 199, 0.3);
-          cursor: pointer;
-        }
-        .booking-seat-booked {
-          border-color: #f87171 !important;
-          background: #fee2e2 !important;
-          color: #b91c1c !important;
-          cursor: not-allowed !important;
-          opacity: 0.95 !important;
-          text-decoration: line-through;
-        }
-        .booking-seat-taken {
-          border-color: #e2e8f0 !important;
-          background: #f1f5f9 !important;
-          color: #94a3b8 !important;
-          cursor: not-allowed !important;
-          opacity: 0.6 !important;
-        }
-        .booking-seat:disabled { cursor: not-allowed; }
         @media (max-width: 990px) {
           .booking-grid { grid-template-columns: minmax(0, 1fr); }
+        }
+        @media (max-width: 600px) {
+          .booking-three-fields { grid-template-columns: minmax(0, 1fr); }
         }
       `}</style>
 
@@ -753,6 +776,7 @@ export default function FlightBooking() {
 
       <div className="booking-grid">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Flight summary */}
           <section style={styles.card}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 18 }}>
               <Plane size={28} color="#0284c7" />
@@ -790,6 +814,7 @@ export default function FlightBooking() {
             </div>
           </section>
 
+          {/* Passengers */}
           <section style={styles.card}>
             <h2 style={{ fontSize: '1.15rem', marginTop: 0 }}>Passenger Details</h2>
 
@@ -800,7 +825,16 @@ export default function FlightBooking() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               {passengers.map((passenger, index) => {
                 const errors = formErrors[index] || {};
-                const selectedSeat = passenger.seat.trim().toUpperCase();
+                const selectedSeat = (passenger.seat || '').trim().toUpperCase();
+
+                // Seats taken on the flight + seats already chosen by other passengers
+                const unavailableSeats = [
+                  ...bookedSeats,
+                  ...passengers
+                    .filter((_, otherIndex) => otherIndex !== index)
+                    .map(other => (other.seat || '').trim().toUpperCase())
+                    .filter(Boolean)
+                ];
 
                 return (
                   <div key={index} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
@@ -828,7 +862,7 @@ export default function FlightBooking() {
                       <FormField
                         label="Title *"
                         value={passenger.title}
-                        placeholder="Enter passenger title"
+                        options={TITLES}
                         error={errors.title}
                         onChange={e => updatePassenger(index, 'title', e.target.value)}
                       />
@@ -854,7 +888,6 @@ export default function FlightBooking() {
                       <FormField
                         label="Date of Birth *"
                         type="date"
-                        placeholder="Enter Date of Birth"
                         value={passenger.dob}
                         error={errors.dob}
                         max={new Date().toISOString().split('T')[0]}
@@ -867,7 +900,7 @@ export default function FlightBooking() {
                         min="1"
                         max="120"
                         value={passenger.age}
-                        placeholder="Age (Auto from DOB)"
+                        placeholder="Age"
                         error={errors.age}
                         onChange={e => updatePassenger(index, 'age', e.target.value)}
                       />
@@ -909,83 +942,11 @@ export default function FlightBooking() {
                       />
                     </div>
 
-                    <div style={{ marginTop: 14 }}>
-                      <div style={{
-                        display: 'flex', justifyContent: 'space-between',
-                        alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6
-                      }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>
-                          Select a Seat
-                        </span>
-                        <div style={{
-                          display: 'flex', alignItems: 'center', gap: 12,
-                          fontSize: '0.75rem', color: '#64748b'
-                        }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{
-                              width: 10, height: 10, borderRadius: 2,
-                              border: '1px solid #cbd5e1', background: '#ffffff', display: 'inline-block'
-                            }} />
-                            Available
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{
-                              width: 10, height: 10, borderRadius: 2,
-                              background: '#0284c7', display: 'inline-block'
-                            }} />
-                            Selected
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{
-                              width: 10, height: 10, borderRadius: 2,
-                              border: '1px solid #f87171', background: '#fee2e2', display: 'inline-block'
-                            }} />
-                            <strong style={{ color: '#b91c1c' }}>Booked</strong>
-                          </span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {SAMPLE_SEATS.map(seat => {
-                          const isBooked = bookedSeats.includes(seat.toUpperCase());
-                          const takenByOther = passengers.some((other, otherIndex) =>
-                            otherIndex !== index && other.seat.trim().toUpperCase() === seat
-                          );
-                          const selected = selectedSeat === seat;
-
-                          let seatClass = 'booking-seat booking-seat-available';
-                          let seatTitle = `Seat ${seat} is available`;
-
-                          if (isBooked) {
-                            seatClass = 'booking-seat booking-seat-booked';
-                            seatTitle = `Seat ${seat} is already booked on this flight`;
-                          } else if (selected) {
-                            seatClass = 'booking-seat booking-seat-selected';
-                            seatTitle = `Seat ${seat} is selected`;
-                          } else if (takenByOther) {
-                            seatClass = 'booking-seat booking-seat-taken';
-                            seatTitle = `Seat ${seat} is chosen by another passenger`;
-                          }
-
-                          return (
-                            <button
-                              type="button"
-                              key={seat}
-                              disabled={isBooked || takenByOther}
-                              className={seatClass}
-                              title={seatTitle}
-                              onClick={() => updatePassenger(index, 'seat', selected ? '' : seat)}
-                            >
-                              {seat}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <small style={{ color: '#64748b', display: 'block', marginTop: 6 }}>
-                        Booked seats are marked in red and cannot be selected. Click an available seat to pick or change.
-                      </small>
-                    </div>
+                    <SeatMap
+                      bookedSeats={unavailableSeats}
+                      selectedSeat={selectedSeat}
+                      onSelect={seat => updatePassenger(index, 'seat', selectedSeat === seat ? '' : seat)}
+                    />
                   </div>
                 );
               })}
@@ -1010,6 +971,7 @@ export default function FlightBooking() {
               </p>
             </div>
 
+            {/* Payment */}
             <div style={{ marginTop: 24 }}>
               <h3 style={{ fontSize: '1rem', marginBottom: 12 }}>Payment Method</h3>
 
@@ -1048,6 +1010,7 @@ export default function FlightBooking() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Coupons */}
           <section style={styles.card}>
             <h2 style={{
               fontSize: '1.1rem', display: 'flex', gap: 8, alignItems: 'center',
@@ -1082,14 +1045,8 @@ export default function FlightBooking() {
                     type="button"
                     onClick={loadCouponBalance}
                     style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#0284c7',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      textDecoration: 'underline',
-                      cursor: 'pointer',
-                      padding: 0
+                      background: 'none', border: 'none', color: '#0284c7', fontSize: '0.78rem',
+                      fontWeight: 600, textDecoration: 'underline', cursor: 'pointer', padding: 0
                     }}
                   >
                     Retry
@@ -1098,14 +1055,11 @@ export default function FlightBooking() {
               )}
             </div>
 
-
-
             <form onSubmit={e => { e.preventDefault(); setShowCouponDropdown(false); handleApplyCoupon(); }}>
               <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
                 <div ref={couponDropdownRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
                   <input
                     type="text"
-                    list="available-coupons-list"
                     value={couponCode}
                     onChange={e => {
                       setCouponCode(e.target.value.toUpperCase());
@@ -1114,7 +1068,7 @@ export default function FlightBooking() {
                     onFocus={() => {
                       if (displayedAvailableCoupons.length > 0) setShowCouponDropdown(true);
                     }}
-                    placeholder={displayedAvailableCoupons.length > 0 ? "Enter or select coupon code" : "Enter coupon code"}
+                    placeholder={displayedAvailableCoupons.length > 0 ? 'Enter or select coupon code' : 'Enter coupon code'}
                     style={{
                       ...styles.input,
                       minWidth: 0,
@@ -1130,18 +1084,9 @@ export default function FlightBooking() {
                       title="Show available coupon"
                       aria-label="Toggle available coupon dropdown"
                       style={{
-                        position: 'absolute',
-                        right: 8,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        color: '#64748b',
-                        cursor: 'pointer',
-                        padding: 4,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                        background: 'none', border: 'none', color: '#64748b', cursor: 'pointer',
+                        padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         borderRadius: 4
                       }}
                     >
@@ -1155,130 +1100,75 @@ export default function FlightBooking() {
                     </button>
                   )}
 
-                  <datalist id="available-coupons-list">
-                    {displayedAvailableCoupons.map((coupon, idx) => {
-                      const code = (coupon.couponCode || coupon.code || '').trim().toUpperCase();
-                      const discountText = coupon.discountPercentage
-                        ? `${coupon.discountPercentage}% OFF`
-                        : coupon.discountAmount
-                          ? `₹${coupon.discountAmount} OFF`
-                          : coupon.discountValue
-                            ? `${coupon.discountType === 'Percentage' ? `${coupon.discountValue}%` : `₹${coupon.discountValue}`} OFF`
-                            : '';
-                      return (
-                        <option key={coupon.couponId || code || idx} value={code}>
-                          {discountText ? `${code} - ${discountText}` : code}
-                        </option>
-                      );
-                    })}
-                  </datalist>
-
                   {showCouponDropdown && displayedAvailableCoupons.length > 0 && (
                     <div
                       style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 4px)',
-                        left: 0,
-                        right: 0,
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: 10,
+                        position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                        background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 10,
                         boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
-                        maxHeight: 220,
-                        overflowY: 'auto',
-                        zIndex: 100
+                        maxHeight: 220, overflowY: 'auto', zIndex: 100
                       }}
                     >
                       <div
                         style={{
-                          padding: '8px 12px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          color: '#64748b',
-                          background: '#f8fafc',
-                          borderBottom: '1px solid #e2e8f0',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
+                          padding: '8px 12px', fontSize: '0.72rem', fontWeight: 700,
+                          textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b',
+                          background: '#f8fafc', borderBottom: '1px solid #e2e8f0',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                         }}
                       >
                         <span>Available Coupon</span>
                         <span style={{ fontSize: '0.68rem', fontWeight: 500, color: '#94a3b8' }}>Click to select</span>
                       </div>
-                      {displayedAvailableCoupons
-                        .filter(c => {
-                          const code = (c.couponCode || c.code || '').toUpperCase();
-                          if (!couponCode) return true;
-                          return code.includes(couponCode.toUpperCase());
-                        })
-                        .map((c, idx) => {
-                          const code = (c.couponCode || c.code || '').toUpperCase();
-                          const discountText = c.discountPercentage
-                            ? `${c.discountPercentage}% OFF`
-                            : c.discountAmount
-                              ? `₹${c.discountAmount} OFF`
-                              : c.discountValue
-                                ? `${c.discountType === 'Percentage' ? `${c.discountValue}%` : `₹${c.discountValue}`} OFF`
-                                : '';
-                          const isSelected = couponCode === code;
-                          return (
-                            <div
-                              key={c.couponId || code || idx}
-                              onClick={() => {
-                                setCouponCode(code);
-                                setShowCouponDropdown(false);
-                              }}
-                              style={{
-                                padding: '10px 12px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                cursor: 'pointer',
-                                borderBottom: '1px solid #f1f5f9',
-                                background: isSelected ? '#f0f9ff' : '#ffffff',
-                                transition: 'background 0.15s'
-                              }}
-                              onMouseEnter={e => {
-                                if (!isSelected) e.currentTarget.style.background = '#f8fafc';
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.background = isSelected ? '#f0f9ff' : '#ffffff';
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Tag size={14} color="#0284c7" />
-                                <span style={{ fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', fontSize: '0.9rem' }}>
-                                  {code}
-                                </span>
-                              </div>
-                              {discountText && (
-                                <span
-                                  style={{
-                                    background: '#ecfdf5',
-                                    color: '#059669',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 700,
-                                    padding: '2px 8px',
-                                    borderRadius: 6
-                                  }}
-                                >
-                                  {discountText}
-                                </span>
-                              )}
+
+                      {filteredDisplayedCoupons.map((c, idx) => {
+                        const code = getCouponCode(c);
+                        const discountText = getDiscountText(c);
+                        const isSelected = couponCode === code;
+                        return (
+                          <div
+                            key={c.couponId || code || idx}
+                            onClick={() => {
+                              setCouponCode(code);
+                              setShowCouponDropdown(false);
+                            }}
+                            style={{
+                              padding: '10px 12px', display: 'flex', justifyContent: 'space-between',
+                              alignItems: 'center', cursor: 'pointer', borderBottom: '1px solid #f1f5f9',
+                              background: isSelected ? '#f0f9ff' : '#ffffff', transition: 'background 0.15s'
+                            }}
+                            onMouseEnter={e => {
+                              if (!isSelected) e.currentTarget.style.background = '#f8fafc';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.background = isSelected ? '#f0f9ff' : '#ffffff';
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <Tag size={14} color="#0284c7" />
+                              <span style={{ fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                                {code}
+                              </span>
                             </div>
-                          );
-                        })}
-                      {displayedAvailableCoupons.filter(c => {
-                        const code = (c.couponCode || c.code || '').toUpperCase();
-                        if (!couponCode) return true;
-                        return code.includes(couponCode.toUpperCase());
-                      }).length === 0 && (
-                          <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
-                            No matching available coupon
+                            {discountText && (
+                              <span
+                                style={{
+                                  background: '#ecfdf5', color: '#059669', fontSize: '0.75rem',
+                                  fontWeight: 700, padding: '2px 8px', borderRadius: 6
+                                }}
+                              >
+                                {discountText}
+                              </span>
+                            )}
                           </div>
-                        )}
+                        );
+                      })}
+
+                      {filteredDisplayedCoupons.length === 0 && (
+                        <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
+                          No matching available coupon
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1301,7 +1191,7 @@ export default function FlightBooking() {
                 <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                   <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Available:</span>
                   {displayedAvailableCoupons.map((c, idx) => {
-                    const code = (c.couponCode || c.code || '').toUpperCase();
+                    const code = getCouponCode(c);
                     const isSelected = couponCode === code;
                     return (
                       <button
@@ -1315,12 +1205,8 @@ export default function FlightBooking() {
                           border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
                           background: isSelected ? '#0284c7' : '#f8fafc',
                           color: isSelected ? '#ffffff' : '#0284c7',
-                          padding: '3px 8px',
-                          borderRadius: 6,
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          fontFamily: 'monospace',
+                          padding: '3px 8px', borderRadius: 6, fontSize: '0.75rem',
+                          fontWeight: 700, cursor: 'pointer', fontFamily: 'monospace',
                           transition: 'all 0.15s'
                         }}
                         title={`Click to select ${code}`}
@@ -1347,16 +1233,28 @@ export default function FlightBooking() {
             )}
 
             {appliedCoupons.length > 0 && (
-              <button
-                type="button"
-                onClick={() => handleRemoveCoupon()}
-                style={{
-                  marginTop: 8, border: 0, color: '#dc2626',
-                  background: 'transparent', cursor: 'pointer'
-                }}
-              >
-                Remove all coupons
-              </button>
+              <div style={{ marginTop: 8 }}>
+                {appliedCoupons.map(coupon => (
+                  <div
+                    key={getCouponCode(coupon)}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      fontSize: '0.82rem', padding: '4px 0'
+                    }}
+                  >
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                      {getCouponCode(coupon)} · -{formatINR(Number(coupon.discountAmount) || 0)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCoupon(getCouponCode(coupon))}
+                      style={{ border: 0, color: '#dc2626', background: 'transparent', cursor: 'pointer' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
 
             {/* Convert points into a coupon code */}
@@ -1365,6 +1263,7 @@ export default function FlightBooking() {
 
               <input
                 type="number"
+                min="0"
                 max={availableCouponPoints}
                 step="1"
                 value={pointsToRedeem}
@@ -1380,9 +1279,7 @@ export default function FlightBooking() {
                   const requested = Number(value);
 
                   if (Number.isInteger(requested) && requested >= 0) {
-                    // Clamp to the user's available balance
-                    const clamped = Math.min(requested, availableCouponPoints);
-                    setPointsToRedeem(String(clamped));
+                    setPointsToRedeem(String(Math.min(requested, availableCouponPoints)));
                   }
                 }}
                 placeholder={`Enter points, e.g. ${availableCouponPoints}`}
@@ -1403,13 +1300,8 @@ export default function FlightBooking() {
                   onClick={handleCreateCoupon}
                   disabled={createDisabled}
                   style={{
-                    padding: '8px 14px',
-                    border: 0,
-                    borderRadius: 8,
-                    background: '#0284c7',
-                    color: '#fff',
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap',
+                    padding: '8px 14px', border: 0, borderRadius: 8, background: '#0284c7',
+                    color: '#fff', fontWeight: 600, whiteSpace: 'nowrap',
                     cursor: createDisabled ? 'not-allowed' : 'pointer',
                     opacity: createDisabled ? 0.5 : 1
                   }}
@@ -1419,7 +1311,7 @@ export default function FlightBooking() {
               </div>
 
               <small style={{ display: 'block', color: '#64748b', marginTop: 6 }}>
-                Available: {availableCouponPoints} points
+                Available: {availableCouponPoints} points (10 points = ₹1)
               </small>
 
               {appliedCoupons.length > 0 && (
@@ -1428,9 +1320,6 @@ export default function FlightBooking() {
                 </small>
               )}
             </div>
-
-
-
 
             {couponsError && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
@@ -1441,14 +1330,8 @@ export default function FlightBooking() {
                   type="button"
                   onClick={loadPassengerCoupons}
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#0284c7',
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
-                    textDecoration: 'underline',
-                    cursor: 'pointer',
-                    padding: 0
+                    background: 'none', border: 'none', color: '#0284c7', fontSize: '0.78rem',
+                    fontWeight: 600, textDecoration: 'underline', cursor: 'pointer', padding: 0
                   }}
                 >
                   Retry
@@ -1457,6 +1340,7 @@ export default function FlightBooking() {
             )}
           </section>
 
+          {/* Fare breakdown */}
           <section style={styles.card}>
             <h2 style={{ fontSize: '1.1rem', marginTop: 0 }}>Fare Breakdown</h2>
 
@@ -1472,11 +1356,11 @@ export default function FlightBooking() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ color: '#475569' }}>Total fare ({passengerCount} passenger(s))</span>
+                <span style={{ color: '#475569' }}>
+                  {selectedClass} fare × {passengerCount} passenger(s)
+                </span>
                 <strong>{fareAvailable ? formatINR(originalFare) : 'Unavailable'}</strong>
               </div>
-
-
 
               <div style={{
                 display: 'flex', justifyContent: 'space-between', gap: 12, color: '#059669'
@@ -1517,7 +1401,7 @@ export default function FlightBooking() {
                 'Processing Reservation...'
               ) : (
                 <>
-                  Confirm Booking ({formatINR(totalAmount)})
+                  Confirm Booking ({fareAvailable ? formatINR(totalAmount) : '—'})
                   <ArrowRight size={18} />
                 </>
               )}

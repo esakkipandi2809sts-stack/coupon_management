@@ -140,7 +140,7 @@ export default function Coupons() {
           c.couponCode.toLowerCase().includes(term) ||
           c.description.toLowerCase().includes(term) ||
           (c.bookingReference || '').toLowerCase().includes(term) ||
-          (c.ownerUsername || '').toLowerCase().includes(term)
+          (c.username || c.ownerUsername || '').toLowerCase().includes(term)
         );
       }
       return true;
@@ -162,24 +162,7 @@ export default function Coupons() {
           </p>
         </div>
 
-        <button
-          onClick={fetchCouponsData}
-          style={{
-            padding: '10px 16px',
-            borderRadius: '12px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #cbd5e1',
-            color: '#334155',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '0.88rem',
-            fontWeight: 600
-          }}
-        >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          <span>Refresh Coupons</span>
-        </button>
+
       </div>
 
       {/* Points Balance Banner — visible to regular users only */}
@@ -468,7 +451,7 @@ export default function Coupons() {
                         </td>
                         {isAdmin && (
                           <td style={{ padding: '14px 18px', color: '#334155' }}>
-                            {c.ownerUsername || `User #${c.userId ?? 'unknown'}`}
+                            {c.username || c.ownerUsername || `User #${c.userId ?? 'unknown'}`}
                           </td>
                         )}
                         <td style={{ padding: '14px 18px', color: '#0284c7', fontWeight: 700 }}>
