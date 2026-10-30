@@ -198,6 +198,24 @@ namespace FlightBookingBackend.Services
                     parsedDob = d;
                 }
 
+                var currentDate = DateOnly.FromDateTime(DateTime.UtcNow);
+                if (primaryAge <= 0 && parsedDob.HasValue)
+                {
+                    var calculatedAge = currentDate.Year - parsedDob.Value.Year;
+                    if (parsedDob.Value > currentDate.AddYears(-calculatedAge)) calculatedAge--;
+                    primaryAge = Math.Max(1, calculatedAge);
+                }
+
+                foreach (var p in passengersList)
+                {
+                    if (p.Age <= 0 && !string.IsNullOrWhiteSpace(p.Dob) && DateOnly.TryParse(p.Dob, out var pDob))
+                    {
+                        var calculatedAge = currentDate.Year - pDob.Year;
+                        if (pDob > currentDate.AddYears(-calculatedAge)) calculatedAge--;
+                        p.Age = Math.Max(1, calculatedAge);
+                    }
+                }
+
                 // Create Booking
                 var booking = new Booking
                 {

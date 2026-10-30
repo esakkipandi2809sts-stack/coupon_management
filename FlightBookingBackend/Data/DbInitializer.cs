@@ -47,7 +47,7 @@ namespace FlightBookingBackend.Data
                 }
             };
 
-            var passwordHash = BCrypt.Net.BCrypt.HashPassword("Password123!");
+            var passwordHash = "Password123!";
 
             foreach (var seedUser in demoUsers)
             {

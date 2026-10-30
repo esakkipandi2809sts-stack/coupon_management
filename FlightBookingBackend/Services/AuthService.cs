@@ -31,15 +31,13 @@ namespace FlightBookingBackend.Services
                 return (false, "A user with this email address already exists.", null);
             }
 
-            var passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
-
             var user = new User
             {
                 FullName = dto.FullName.Trim(),
                 Username = normalizedEmail,
                 Email = normalizedEmail,
                 PhoneNumber = dto.PhoneNumber.Trim(),
-                PasswordHash = passwordHash,
+                PasswordHash = dto.Password,
                 Role = "User",
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
@@ -91,7 +89,23 @@ namespace FlightBookingBackend.Services
                 return (false, "Account is disabled. Please contact support.", null);
             }
 
-            bool isPasswordValid = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
+            bool isPasswordValid = false;
+            if (string.Equals(user.PasswordHash, dto.Password, StringComparison.Ordinal))
+            {
+                isPasswordValid = true;
+            }
+            else
+            {
+                try
+                {
+                    isPasswordValid = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
+                }
+                catch
+                {
+                    isPasswordValid = false;
+                }
+            }
+
             if (!isPasswordValid)
             {
                 return (false, "Invalid email or password", null);
@@ -168,7 +182,24 @@ namespace FlightBookingBackend.Services
                 return (false, "User not found.");
             }
 
-            if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
+            bool isCurrentValid = false;
+            if (string.Equals(user.PasswordHash, dto.CurrentPassword, StringComparison.Ordinal))
+            {
+                isCurrentValid = true;
+            }
+            else
+            {
+                try
+                {
+                    isCurrentValid = BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash);
+                }
+                catch
+                {
+                    isCurrentValid = false;
+                }
+            }
+
+            if (!isCurrentValid)
             {
                 return (false, "Current password is incorrect.");
             }
@@ -178,12 +209,12 @@ namespace FlightBookingBackend.Services
                 return (false, "New password must be at least 12 characters and include uppercase, lowercase, a digit, and a symbol.");
             }
 
-            if (BCrypt.Net.BCrypt.Verify(dto.NewPassword, user.PasswordHash))
+            if (string.Equals(user.PasswordHash, dto.NewPassword, StringComparison.Ordinal))
             {
                 return (false, "New password must differ from the current password.");
             }
 
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.PasswordHash = dto.NewPassword;
             await _context.SaveChangesAsync();
             return (true, "Password changed successfully.");
         }

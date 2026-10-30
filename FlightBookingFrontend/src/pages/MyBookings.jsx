@@ -218,6 +218,80 @@ export default function MyBookings() {
     setLoadingBookedSeats(false);
   };
 
+  const loadFlightsForDate = async (booking, targetDate) => {
+    if (!booking || !targetDate) return;
+
+    setFlightOptionsLoading(true);
+    setRescheduleError('');
+
+    try {
+      const [routeRes, dateRes] = await Promise.allSettled([
+        flightApi.getByRoute(booking.fromCity, booking.toCity),
+        flightApi.searchByRoute(booking.fromCity, booking.toCity, targetDate),
+      ]);
+
+      const routeFlights =
+        routeRes.status === 'fulfilled' && Array.isArray(routeRes.value?.data)
+          ? routeRes.value.data
+          : [];
+      const dateFlights =
+        dateRes.status === 'fulfilled' && Array.isArray(dateRes.value?.data)
+          ? dateRes.value.data
+          : [];
+
+      // Combine unique flights
+      const flightMap = new Map();
+      [...routeFlights, ...dateFlights].forEach((f) => {
+        if (f && f.flightId) flightMap.set(String(f.flightId), f);
+      });
+
+      const today = todayIso();
+      const availableFlights = Array.from(flightMap.values())
+        .filter(
+          (flight) =>
+            String(flight.flightId) !== String(booking.flightId) &&
+            Number(flight.availableSeats) > 0 &&
+            (!flight.status ||
+              ['scheduled', 'available', 'active'].includes(
+                String(flight.status).toLowerCase()
+              )) &&
+            dateOnly(flight.departureDate) >= today
+        )
+        .sort((a, b) => {
+          const dateCompare = dateOnly(a.departureDate).localeCompare(
+            dateOnly(b.departureDate)
+          );
+          return (
+            dateCompare ||
+            String(a.departureTime ?? '').localeCompare(
+              String(b.departureTime ?? '')
+            )
+          );
+        });
+
+      setFlightOptions(availableFlights);
+
+      // Filter for flights specifically on the newly selected date
+      const targetFlights = availableFlights.filter(
+        (f) => dateOnly(f.departureDate) === targetDate
+      );
+
+      if (targetFlights.length > 0) {
+        setSelectedFlightId(String(targetFlights[0].flightId));
+      } else {
+        setSelectedFlightId('');
+      }
+    } catch (err) {
+      console.error('Failed to load reschedule flights for date:', err);
+      setRescheduleError(
+        err.response?.data?.message ||
+          'Unable to load flights for the selected date.'
+      );
+    } finally {
+      setFlightOptionsLoading(false);
+    }
+  };
+
   const handleReschedule = async (bookingOrId) => {
     let booking = bookingOrId;
     if (typeof bookingOrId === 'number' || typeof bookingOrId === 'string') {
@@ -230,67 +304,14 @@ export default function MyBookings() {
     setRescheduleSeat(booking.seatNumber || '');
     setRescheduleError('');
     setFlightOptions([]);
-    setSelectedDate(todayIso());
-    setFlightOptionsLoading(true);
 
-    try {
-      const res = await flightApi.getByRoute(
-        booking.fromCity,
-        booking.toCity
-      );
+    const bookingDateStr = booking.departureDate
+      ? dateOnly(booking.departureDate)
+      : todayIso();
+    const initialDate = bookingDateStr >= todayIso() ? bookingDateStr : todayIso();
+    setSelectedDate(initialDate);
 
-      const today = todayIso();
-
-      const availableFlights = (Array.isArray(res.data) ? res.data : [])
-        .filter(
-          (flight) =>
-            String(flight.flightId) !== String(booking.flightId) &&
-            Number(flight.availableSeats) > 0 &&
-            String(flight.status).toLowerCase() === 'scheduled' &&
-            dateOnly(flight.departureDate) >= today
-        )
-        .sort((a, b) => {
-          const dateCompare = dateOnly(a.departureDate).localeCompare(
-            dateOnly(b.departureDate)
-          );
-
-          return (
-            dateCompare ||
-            String(a.departureTime ?? '').localeCompare(
-              String(b.departureTime ?? '')
-            )
-          );
-        });
-
-      setFlightOptions(availableFlights);
-
-      if (availableFlights.length > 0) {
-        const sameDateFlight = availableFlights.find(
-          (f) => dateOnly(f.departureDate) === dateOnly(booking.departureDate)
-        );
-        const initialDate = sameDateFlight
-          ? dateOnly(sameDateFlight.departureDate)
-          : dateOnly(availableFlights[0].departureDate);
-
-        setSelectedDate(initialDate);
-
-        const initialFlights = availableFlights.filter(
-          (f) => dateOnly(f.departureDate) === initialDate
-        );
-        if (initialFlights.length > 0) {
-          setSelectedFlightId(String(initialFlights[0].flightId));
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load reschedule flights:', err);
-
-      setRescheduleError(
-        err.response?.data?.message ||
-        'Unable to load flights for this route.'
-      );
-    } finally {
-      setFlightOptionsLoading(false);
-    }
+    await loadFlightsForDate(booking, initialDate);
   };
 
   const flightsForSelectedDate = useMemo(
@@ -1210,9 +1231,13 @@ export default function MyBookings() {
                   min={todayIso()}
                   value={selectedDate}
                   onChange={(event) => {
-                    setSelectedDate(event.target.value);
+                    const newDate = event.target.value;
+                    setSelectedDate(newDate);
                     setSelectedFlightId('');
                     setRescheduleError('');
+                    if (rescheduleTarget && newDate) {
+                      loadFlightsForDate(rescheduleTarget, newDate);
+                    }
                   }}
                   style={{
                     width: '100%',
@@ -1246,7 +1271,7 @@ export default function MyBookings() {
                     color: '#334155',
                   }}
                 >
-                  Available flights
+                  Available flights for {formatDisplayDate(selectedDate)}
                 </label>
 
                 <span style={{ color: '#64748b', fontSize: '0.76rem' }}>
@@ -1255,9 +1280,21 @@ export default function MyBookings() {
               </div>
 
               {flightOptionsLoading ? (
-                <p style={{ color: '#64748b', fontSize: '0.88rem' }}>
-                  Loading available flights...
-                </p>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    color: '#64748b',
+                    fontSize: '0.88rem',
+                    background: '#f8fafc',
+                    padding: '14px',
+                    borderRadius: '12px',
+                  }}
+                >
+                  <RefreshCw size={15} className="animate-spin" />
+                  Loading available flights for {formatDisplayDate(selectedDate)}...
+                </div>
               ) : flightOptions.length === 0 ? (
                 <p
                   style={{
@@ -1281,7 +1318,7 @@ export default function MyBookings() {
                     borderRadius: '12px',
                   }}
                 >
-                  No available flights on this date. Please choose another
+                  No available flights on {formatDisplayDate(selectedDate)}. Please choose another
                   date.
                 </p>
               ) : (

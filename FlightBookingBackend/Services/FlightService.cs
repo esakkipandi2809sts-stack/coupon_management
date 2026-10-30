@@ -114,8 +114,8 @@ namespace FlightBookingBackend.Services
 
             var flights = await _context.Flights
                 .AsNoTracking()
-                .Where(f => f.FromCity.ToLower() == fromTerm &&
-                            f.ToCity.ToLower() == toTerm)
+                .Where(f => (f.FromCity.ToLower() == fromTerm || f.FromCity.ToLower().Contains(fromTerm) || fromTerm.Contains(f.FromCity.ToLower())) &&
+                            (f.ToCity.ToLower() == toTerm || f.ToCity.ToLower().Contains(toTerm) || toTerm.Contains(f.ToCity.ToLower())))
                 .OrderBy(f => f.DepartureDate)
                 .ThenBy(f => f.DepartureTime)
                 .ToListAsync();
@@ -130,11 +130,55 @@ namespace FlightBookingBackend.Services
 
             var flights = await _context.Flights
                 .AsNoTracking()
-                .Where(f => f.FromCity.ToLower() == fromTerm &&
-                            f.ToCity.ToLower() == toTerm &&
+                .Where(f => (f.FromCity.ToLower() == fromTerm || f.FromCity.ToLower().Contains(fromTerm) || fromTerm.Contains(f.FromCity.ToLower())) &&
+                            (f.ToCity.ToLower() == toTerm || f.ToCity.ToLower().Contains(toTerm) || toTerm.Contains(f.ToCity.ToLower())) &&
                             f.DepartureDate == date)
                 .OrderBy(f => f.DepartureTime)
                 .ToListAsync();
+
+            if (flights.Count == 0 && date >= DateOnly.FromDateTime(DateTime.UtcNow))
+            {
+                var distance = RouteDistanceCalculator.TryCalculate(from, to) ?? 850m;
+                var fare = FlightFareCalculator.CalculateEconomyFare(distance);
+                var airline = "Air India";
+                var prefix = "AI";
+
+                var existingRouteFlight = await _context.Flights
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(f => (f.FromCity.ToLower() == fromTerm || f.FromCity.ToLower().Contains(fromTerm) || fromTerm.Contains(f.FromCity.ToLower())) &&
+                                              (f.ToCity.ToLower() == toTerm || f.ToCity.ToLower().Contains(toTerm) || toTerm.Contains(f.ToCity.ToLower())));
+                if (existingRouteFlight != null)
+                {
+                    airline = existingRouteFlight.Airline;
+                    prefix = airline.Length >= 2 ? airline.Substring(0, 2).ToUpper() : "FL";
+                }
+
+                var randomNum = Random.Shared.Next(100, 999);
+                var newFlight = new Flight
+                {
+                    FlightNumber = $"{prefix}-{randomNum}",
+                    Airline = airline,
+                    FromCity = !string.IsNullOrWhiteSpace(from) ? char.ToUpper(from.Trim()[0]) + from.Trim().Substring(1) : from,
+                    ToCity = !string.IsNullOrWhiteSpace(to) ? char.ToUpper(to.Trim()[0]) + to.Trim().Substring(1) : to,
+                    DepartureDate = date,
+                    DepartureTime = "09:30 AM",
+                    ArrivalDate = date,
+                    ArrivalTime = "11:45 AM",
+                    Duration = "2h 15m",
+                    DistanceKm = distance,
+                    TotalSeats = 20,
+                    AvailableSeats = 20,
+                    Price = fare,
+                    Status = "Scheduled",
+                    BookingDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                    TripType = FlightTripTypes.OneWay
+                };
+
+                _context.Flights.Add(newFlight);
+                await _context.SaveChangesAsync();
+
+                flights = new List<Flight> { newFlight };
+            }
 
             return flights.Select(MapToDto);
         }

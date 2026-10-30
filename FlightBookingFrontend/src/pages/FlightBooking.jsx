@@ -78,6 +78,42 @@ function FormField({ label, value, onChange, error, type = 'text', placeholder =
   );
 }
 
+const calculateAgeFromDob = (dobString) => {
+  if (!dobString) return '';
+  const parts = String(dobString).split('-');
+  if (parts.length !== 3) {
+    const d = new Date(dobString);
+    if (Number.isNaN(d.getTime())) return '';
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) {
+      age--;
+    }
+    return age >= 0 ? String(age) : '0';
+  }
+
+  const birthYear = parseInt(parts[0], 10);
+  const birthMonth = parseInt(parts[1], 10);
+  const birthDay = parseInt(parts[2], 10);
+
+  if (Number.isNaN(birthYear) || Number.isNaN(birthMonth) || Number.isNaN(birthDay)) {
+    return '';
+  }
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1; // 1-indexed (1 to 12)
+  const currentDay = today.getDate();
+
+  let age = currentYear - birthYear;
+  if (currentMonth < birthMonth || (currentMonth === birthMonth && currentDay < birthDay)) {
+    age--;
+  }
+
+  return age >= 0 ? String(age) : '0';
+};
+
 export default function FlightBooking() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -214,6 +250,15 @@ export default function FlightBooking() {
         const last = field === 'lastName' ? value : (updated.lastName || '');
         const combined = [first, last].filter(Boolean).join(' ').trim();
         updated.name = combined || updated.name || '';
+
+        // Calculate the passenger's age automatically based on Date of Birth (DOB)
+        if (field === 'dob') {
+          const autoAge = calculateAgeFromDob(value);
+          if (autoAge !== '') {
+            updated.age = autoAge;
+          }
+        }
+
         return updated;
       })
     );
@@ -223,6 +268,9 @@ export default function FlightBooking() {
       if (next[index]) {
         next[index] = { ...next[index] };
         delete next[index][field];
+        if (field === 'dob') {
+          delete next[index].age;
+        }
       }
       return next;
     });
@@ -819,7 +867,7 @@ export default function FlightBooking() {
                         min="1"
                         max="120"
                         value={passenger.age}
-                        placeholder="Age"
+                        placeholder="Age (Auto from DOB)"
                         error={errors.age}
                         onChange={e => updatePassenger(index, 'age', e.target.value)}
                       />
