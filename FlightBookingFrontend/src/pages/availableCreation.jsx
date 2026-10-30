@@ -75,7 +75,7 @@ const emptySegment = (overrides = {}) => ({
   fromCity: '',
   toCity: '',
   stopCount: 0,
-  distanceKm: '',  
+  distanceKm: '',
   price: '',
   departureDate: '',
   departureTime: '',
@@ -207,7 +207,7 @@ function validateSegment(segment, today) {
     segment.departureDate &&
     segment.arrivalDate &&
     toTimestamp(segment.arrivalDate, segment.arrivalTime) <=
-      toTimestamp(segment.departureDate, segment.departureTime)
+    toTimestamp(segment.departureDate, segment.departureTime)
   ) {
     errs.arrivalDate = 'Arrival must be after departure.';
   }
@@ -293,7 +293,7 @@ function validateItinerary(tripType, segments, today) {
         current.departureDate &&
         previous.arrivalDate &&
         toTimestamp(current.departureDate, current.departureTime) <
-          toTimestamp(previous.arrivalDate, previous.arrivalTime)
+        toTimestamp(previous.arrivalDate, previous.arrivalTime)
       ) {
         put(
           current,
@@ -584,7 +584,7 @@ function SegmentForm({
           icon={Users}
           error={err('totalSeats')}
         >
-          <input          
+          <input
             {...input('totalSeats', {
               type: 'number',
               min: 1,
@@ -659,7 +659,7 @@ export default function AvailableCreation() {
     } catch (err) {
       setFlightListError(
         err.response?.data?.message ||
-          'Flights could not be loaded. Please try again.'
+        'Flights could not be loaded. Please try again.'
       );
     } finally {
       setFlightListLoading(false);
@@ -872,7 +872,7 @@ export default function AvailableCreation() {
       setErrors(result.errors);
       setFormError(
         result.formError ||
-          'Please correct the highlighted fields.'
+        'Please correct the highlighted fields.'
       );
       return;
     }
@@ -914,10 +914,9 @@ export default function AvailableCreation() {
 
       setErrorMsg(
         data?.message ||
-          (typeof data === 'string' ? data : null) ||
-          `Failed to ${
-            editing ? 'update' : 'create'
-          } flight. Please check your input and try again.`
+        (typeof data === 'string' ? data : null) ||
+        `Failed to ${editing ? 'update' : 'create'
+        } flight. Please check your input and try again.`
       );
     } finally {
       submittingRef.current = false;
@@ -981,7 +980,7 @@ export default function AvailableCreation() {
     } catch (err) {
       setDeleteError(
         err.response?.data?.message ||
-          'Failed to delete flight. Please try again.'
+        'Failed to delete flight. Please try again.'
       );
     } finally {
       setDeletingFlightId(null);
@@ -994,9 +993,9 @@ export default function AvailableCreation() {
     tripType === 'OneWay'
       ? null
       : segments.reduce((sum, seg) => {
-          const f = segmentFare(seg);
-          return sum !== null && f !== null ? sum + f : null;
-        }, 0);
+        const f = segmentFare(seg);
+        return sum !== null && f !== null ? sum + f : null;
+      }, 0);
 
   const errorList = Object.values(errors);
 
@@ -1028,9 +1027,8 @@ export default function AvailableCreation() {
     const type = TRIP_LABELS[flight.tripType] || 'One Way';
 
     if (flight.tripType === 'RoundTrip') {
-      return `${type} · ${
-        flight.segmentOrder === 2 ? 'Return' : 'Outbound'
-      }`;
+      return `${type} · ${flight.segmentOrder === 2 ? 'Return' : 'Outbound'
+        }`;
     }
 
     if (flight.tripType === 'MultiCity') {
@@ -1115,7 +1113,7 @@ export default function AvailableCreation() {
                 <span>
                   {flight.fromCity} → {flight.toCity}
                 </span>
-               
+
                 <span>
                   {flight.departureDate} - {flight.departureTime}
                 </span>
@@ -1152,9 +1150,8 @@ export default function AvailableCreation() {
                 type="button"
                 role="tab"
                 aria-selected={tripType === type.id}
-                className={`ac-tab${
-                  tripType === type.id ? ' is-active' : ''
-                }`}
+                className={`ac-tab${tripType === type.id ? ' is-active' : ''
+                  }`}
                 onClick={() => switchTripType(type.id)}
                 disabled={
                   submitting ||
@@ -1323,14 +1320,14 @@ export default function AvailableCreation() {
             <table className="ac-flights-table">
               <thead>
                 <tr>
-                  <th style={{textAlign:'center'}}>Travel Place</th>
-                  <th style={{textAlign:'center'}}>Flight Number</th>
-                  <th style={{textAlign:'center'}}>Booking Date</th>
-                  <th style={{textAlign:'center'}}>Departure Date</th>
-                  <th style={{textAlign:'center'}}>Price</th>
-                  <th style={{textAlign:'center'}}>Status</th>
-                  <th style={{textAlign:'center'}}>Trip Type</th>
-                  <th style={{textAlign:'center'}}>Created By</th>
+                  <th style={{ textAlign: 'center' }}>Travel Place</th>
+                  <th style={{ textAlign: 'center' }}>Flight Number</th>
+                  <th style={{ textAlign: 'center' }}>Booking Date</th>
+                  <th style={{ textAlign: 'center' }}>Departure Date</th>
+                  <th style={{ textAlign: 'center' }}>Price</th>
+                  <th style={{ textAlign: 'center' }}>Status</th>
+                  <th style={{ textAlign: 'center' }}>Trip Type</th>
+                  <th style={{ textAlign: 'center' }}>Created By</th>
                   {isAdmin && <th>Actions</th>}
                 </tr>
               </thead>
@@ -1354,11 +1351,10 @@ export default function AvailableCreation() {
 
                     <td>
                       <span
-                        className={`ac-flight-status ${
-                          String(flight.status || '')
+                        className={`ac-flight-status ${String(flight.status || '')
                             .toLowerCase()
                             .replace(/\s+/g, '-')
-                        }`}
+                          }`}
                       >
                         {flight.status || 'Scheduled'}
                       </span>
@@ -1366,7 +1362,7 @@ export default function AvailableCreation() {
 
                     <td>{describeFlight(flight)}</td>
 
-                    <td style={{textAlign:'center'}}>
+                    <td style={{ textAlign: 'center' }}>
                       {flight.createdByUserName || '-'}
                     </td>
 
@@ -1419,7 +1415,7 @@ export default function AvailableCreation() {
             </table>
           </div>
         )}
-        
+
       </section>
 
       {/* -------------------- Delete Confirmation -------------------- */}
@@ -1478,7 +1474,7 @@ export default function AvailableCreation() {
           </div>
         </div>
       )}
-     
+
     </div>
   );
 }
