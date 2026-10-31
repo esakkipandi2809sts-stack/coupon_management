@@ -1346,13 +1346,11 @@ export default function AvailableCreation() {
             <table className="ac-flights-table">
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left' }}>Flight</th>
-                  <th style={{ textAlign: 'left' }}>Route</th>
+                  <th style={{ textAlign: 'center' }}>Flight</th>
+                  <th style={{ textAlign: 'center' }}>Route</th>
                   <th style={{ textAlign: 'center' }}>Departure</th>
                   <th style={{ textAlign: 'center' }}>Arrival</th>
-                  <th style={{ textAlign: 'center' }}>Duration</th>
-                  <th style={{ textAlign: 'right' }}>Price</th>
-                  <th style={{ textAlign: 'center' }}>Seats</th>
+                  <th style={{ textAlign: 'center' }}>Price</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
                   <th style={{ textAlign: 'center' }}>Trip Type</th>
                   <th style={{ textAlign: 'center' }}>Created By</th>
@@ -1363,7 +1361,7 @@ export default function AvailableCreation() {
               <tbody>
                 {sortedFlights.map((flight) => (
                   <tr key={flight.flightId}>
-                    <td style={{ textAlign: 'left' }}>
+                    <td style={{ textAlign: 'center' }}>
                       <strong>{flight.flightNumber}</strong>
                       {flight.airline && (
                         <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
@@ -1372,7 +1370,7 @@ export default function AvailableCreation() {
                       )}
                     </td>
 
-                    <td style={{ textAlign: 'left' }}>
+                    <td style={{ textAlign: 'center' }}>
                       <div style={{ fontWeight: 600 }}>
                         {flight.fromCity} → {flight.toCity}
                       </div>
@@ -1380,28 +1378,16 @@ export default function AvailableCreation() {
 
                     <td style={{ textAlign: 'center' }}>
                       <div>{flight.departureDate || '—'}</div>
-                      <strong style={{ color: '#0f172a' }}>{flight.departureTime || '—'}</strong>
                     </td>
 
                     <td style={{ textAlign: 'center' }}>
                       <div>{flight.arrivalDate || '—'}</div>
-                      <strong style={{ color: '#0f172a' }}>{flight.arrivalTime || '—'}</strong>
-                    </td>
-
-                    <td style={{ textAlign: 'center' }}>
-                      <span className="ac-chip" style={{ background: '#f1f5f9', color: '#334155' }}>
-                        {normalizeDurationDisplay(flight.duration) || flight.duration || '—'}
-                      </span>
                     </td>
 
                     <td style={{ textAlign: 'right' }}>
                       <strong style={{ color: '#0284c7', fontSize: '0.98rem' }}>
                         {formatINR(flight.price)}
                       </strong>
-                    </td>
-
-                    <td style={{ textAlign: 'center', fontSize: '0.84rem' }}>
-                      {flight.availableSeats ?? '—'} / {flight.totalSeats ?? '—'}
                     </td>
 
                     <td style={{ textAlign: 'center' }}>
