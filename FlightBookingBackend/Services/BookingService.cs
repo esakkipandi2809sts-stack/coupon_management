@@ -514,6 +514,8 @@ namespace FlightBookingBackend.Services
 
         public async Task<IEnumerable<BookingDetailDto>> GetUserBookingsAsync(int userId)
         {
+            await UpdatePassedBookingsToTravelledAsync();
+
             var bookings = await _context.Bookings
                 .Include(b => b.Flight)
                 .Include(b => b.CouponUsages)
@@ -529,6 +531,8 @@ namespace FlightBookingBackend.Services
 
         public async Task<BookingDetailDto?> GetBookingByIdAsync(int bookingId, int userId)
         {
+            await UpdatePassedBookingsToTravelledAsync();
+
             var booking = await _context.Bookings
                 .Include(b => b.Flight)
                 .Include(b => b.CouponUsages)
@@ -563,6 +567,12 @@ namespace FlightBookingBackend.Services
             {
                 await transaction.RollbackAsync();
                 return (false, "A failed booking cannot be cancelled.");
+            }
+
+            if (string.Equals(booking.BookingStatus, BookingStatuses.Travelled, StringComparison.OrdinalIgnoreCase))
+            {
+                await transaction.RollbackAsync();
+                return (false, "A travelled booking cannot be cancelled.");
             }
 
             // Update Booking Status to Cancelled in the database
@@ -675,6 +685,7 @@ namespace FlightBookingBackend.Services
                 {
                     BookingStatuses.Cancelled => "A cancelled booking cannot be rescheduled.",
                     BookingStatuses.Failed => "A failed booking cannot be rescheduled.",
+                    BookingStatuses.Travelled => "A travelled booking cannot be rescheduled.",
                     _ => "Only confirmed bookings can be rescheduled."
                 };
                 return (false, reason, null);
@@ -819,12 +830,22 @@ namespace FlightBookingBackend.Services
                 return (false, "A failed booking cannot be rescheduled.", null);
             }
 
+            if (string.Equals(booking.BookingStatus, BookingStatuses.Travelled, StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, "A travelled booking cannot be rescheduled.", null);
+            }
+
             booking.BookingStatus = BookingStatuses.Rescheduled;
             booking.RescheduleDate = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             var updated = await GetBookingByIdAsync(bookingId, userId);
             return (true, "Booking status updated to Rescheduled successfully.", updated);
+        }
+
+        public Task<int> UpdatePassedBookingsToTravelledAsync()
+        {
+            return BookingStatusTransitionHelper.UpdatePassedBookingsToTravelledAsync(_context, _couponService.GetBusinessDate());
         }
 
         private static BookingDetailDto MapToDetailDto(Booking b)

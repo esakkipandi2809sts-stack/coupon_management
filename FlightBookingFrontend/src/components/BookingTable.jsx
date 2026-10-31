@@ -7,6 +7,7 @@ const STATUS_BADGES = {
   Cancelled: 'badge-cancelled',
   Rescheduled: 'badge-rescheduled',
   Failed: 'badge-failed',
+  Travelled: 'badge-travelled',
 };
 
 // Confirmed and Rescheduled bookings are active tickets; Cancelled and Failed ones are final.

@@ -24,6 +24,7 @@ const STATUS_FILTERS = [
   'All',
   'Confirmed',
   'Rescheduled',
+  'Travelled',
   'Cancelled',
   'Failed',
 ];

@@ -187,11 +187,11 @@ CREATE TABLE dbo.Bookings (
     IdempotencyKey UNIQUEIDENTIFIER NULL,
     Taxes DECIMAL(18,2) NOT NULL,
     TicketPrice DECIMAL(18,2) NOT NULL,
-    BookingStatus NVARCHAR(50) NOT NULL CONSTRAINT DF_Bookings_BookingStatus DEFAULT N'Confirmed', -- Confirmed | Pending | Cancelled | Rescheduled | Failed
+    BookingStatus NVARCHAR(50) NOT NULL CONSTRAINT DF_Bookings_BookingStatus DEFAULT N'Confirmed', -- Confirmed | Pending | Cancelled | Rescheduled | Failed | Travelled
     PaymentStatus NVARCHAR(50) NOT NULL CONSTRAINT DF_Bookings_PaymentStatus DEFAULT N'Paid',      -- Paid | Pending | Failed | Refunded
     CONSTRAINT PK_Bookings PRIMARY KEY CLUSTERED (BookingId ASC),
     CONSTRAINT UQ_Bookings_Reference UNIQUE NONCLUSTERED (BookingReference ASC),
-    CONSTRAINT CK_Bookings_BookingStatus CHECK (BookingStatus IN (N'Confirmed', N'Pending', N'Cancelled', N'Rescheduled', N'Failed')),
+    CONSTRAINT CK_Bookings_BookingStatus CHECK (BookingStatus IN (N'Confirmed', N'Pending', N'Cancelled', N'Rescheduled', N'Failed', N'Travelled')),
     CONSTRAINT FK_Bookings_Users FOREIGN KEY (UserId) REFERENCES dbo.Users (Id) ON DELETE NO ACTION,
     CONSTRAINT FK_Bookings_Flights FOREIGN KEY (FlightId) REFERENCES dbo.Flights (FlightId) ON DELETE NO ACTION
 );

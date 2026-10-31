@@ -107,7 +107,7 @@ namespace FlightBookingBackend.Data
                 {
                     table.HasCheckConstraint(
                         "CK_Bookings_BookingStatus",
-                        "[BookingStatus] IN ('Confirmed', 'Pending', 'Cancelled', 'Rescheduled', 'Failed')");
+                        "[BookingStatus] IN ('Confirmed', 'Pending', 'Cancelled', 'Rescheduled', 'Failed', 'Travelled')");
                 });
                 entity.HasIndex(e => new { e.UserId, e.IdempotencyKey })
                     .IsUnique()

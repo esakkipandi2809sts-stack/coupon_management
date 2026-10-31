@@ -11,7 +11,8 @@ namespace FlightBookingBackend.Models
         public const string Cancelled = "Cancelled";
         public const string Rescheduled = "Rescheduled";
         public const string Failed = "Failed";
+        public const string Travelled = "Travelled";
 
-        public static readonly string[] All = { Confirmed, Pending, Cancelled, Rescheduled, Failed };
+        public static readonly string[] All = { Confirmed, Pending, Cancelled, Rescheduled, Failed, Travelled };
     }
 }

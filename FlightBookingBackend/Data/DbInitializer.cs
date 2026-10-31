@@ -296,10 +296,20 @@ IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL
             // Only added when every existing row already uses a supported status, so startup never fails on legacy data.
             context.Database.ExecuteSqlRaw(@"
 IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Bookings_BookingStatus' AND parent_object_id = OBJECT_ID(N'dbo.Bookings'))
-   AND NOT EXISTS (SELECT 1 FROM dbo.Bookings WHERE BookingStatus NOT IN (N'Confirmed', N'Pending', N'Cancelled', N'Rescheduled', N'Failed'))
-    ALTER TABLE dbo.Bookings ADD CONSTRAINT CK_Bookings_BookingStatus
-        CHECK (BookingStatus IN (N'Confirmed', N'Pending', N'Cancelled', N'Rescheduled', N'Failed'));
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM sys.check_constraints 
+        WHERE name = N'CK_Bookings_BookingStatus' 
+          AND parent_object_id = OBJECT_ID(N'dbo.Bookings')
+          AND definition NOT LIKE N'%Travelled%'
+    )
+        ALTER TABLE dbo.Bookings DROP CONSTRAINT CK_Bookings_BookingStatus;
+
+    IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Bookings_BookingStatus' AND parent_object_id = OBJECT_ID(N'dbo.Bookings'))
+       AND NOT EXISTS (SELECT 1 FROM dbo.Bookings WHERE BookingStatus NOT IN (N'Confirmed', N'Pending', N'Cancelled', N'Rescheduled', N'Failed', N'Travelled'))
+        ALTER TABLE dbo.Bookings ADD CONSTRAINT CK_Bookings_BookingStatus
+            CHECK (BookingStatus IN (N'Confirmed', N'Pending', N'Cancelled', N'Rescheduled', N'Failed', N'Travelled'));
+END
 ");
 
             context.Database.ExecuteSqlRaw(@"

@@ -1325,7 +1325,7 @@ export default function FlightBooking() {
                     opacity: createDisabled ? 0.5 : 1
                   }}
                 >
-                  {creatingCoupon ? 'Creating...' : 'Create Coupon'}
+                  {creatingCoupon ? 'Creating...' : 'Apply'}
                 </button>
               </div>
 

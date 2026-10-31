@@ -18,6 +18,8 @@ namespace FlightBookingBackend.Services
 
         public async Task<DashboardStatisticsDto> GetDashboardStatisticsAsync(int userId)
         {
+            await BookingStatusTransitionHelper.UpdatePassedBookingsToTravelledAsync(_context, _couponService.GetBusinessDate());
+
             var couponStats = await _couponService.GetCouponStatisticsAsync(userId);
 
             var totalBookings = await _context.Bookings.CountAsync();
@@ -44,6 +46,8 @@ namespace FlightBookingBackend.Services
 
         public async Task<BookingStatisticsDto> GetBookingStatisticsAsync(int userId, bool isAdmin)
         {
+            await BookingStatusTransitionHelper.UpdatePassedBookingsToTravelledAsync(_context, _couponService.GetBusinessDate());
+
             // Passengers only ever see their own bookings; administrators see the whole system.
             var bookings = _context.Bookings.AsNoTracking().AsQueryable();
             if (!isAdmin)
@@ -67,12 +71,15 @@ namespace FlightBookingBackend.Services
                 TotalBookings = countsByStatus.Sum(c => c.Count),
                 CancelledBookings = CountOf(BookingStatuses.Cancelled),
                 RescheduledBookings = CountOf(BookingStatuses.Rescheduled),
-                FailedBookings = CountOf(BookingStatuses.Failed)
+                FailedBookings = CountOf(BookingStatuses.Failed),
+                TravelledBookings = CountOf(BookingStatuses.Travelled)
             };
         }
 
         public async Task<IEnumerable<RecentBookingDto>> GetRecentBookingsAsync(int count = 10)
         {
+            await BookingStatusTransitionHelper.UpdatePassedBookingsToTravelledAsync(_context, _couponService.GetBusinessDate());
+
             var bookings = await _context.Bookings
                 .Include(b => b.Flight)
                 .OrderByDescending(b => b.BookingDate)

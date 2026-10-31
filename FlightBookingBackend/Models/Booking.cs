@@ -77,7 +77,7 @@ namespace FlightBookingBackend.Models
 
         [Required]
         [MaxLength(50)]
-        public string BookingStatus { get; set; } = BookingStatuses.Confirmed; // Confirmed | Pending | Cancelled | Rescheduled | Failed
+        public string BookingStatus { get; set; } = BookingStatuses.Confirmed; // Confirmed | Pending | Cancelled | Rescheduled | Failed | Travelled
 
         [Required]
         [MaxLength(50)]

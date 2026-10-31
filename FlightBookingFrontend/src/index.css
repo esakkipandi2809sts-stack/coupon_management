@@ -134,6 +134,13 @@ input, select, textarea {
   border: 1px solid #fdba74;
 }
 
+/* Badge for Travelled - light sky blue */
+.badge-travelled {
+  background-color: #e0f2fe;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
+}
+
 .badge-used {
   background-color: #eff6ff;
   color: #2563eb;

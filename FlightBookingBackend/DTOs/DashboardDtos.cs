@@ -19,6 +19,7 @@ namespace FlightBookingBackend.DTOs
         public int CancelledBookings { get; set; }
         public int RescheduledBookings { get; set; }
         public int FailedBookings { get; set; }
+        public int TravelledBookings { get; set; }
     }
 
     public class RecentBookingDto

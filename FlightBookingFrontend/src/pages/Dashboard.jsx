@@ -995,7 +995,14 @@ export default function Dashboard() {
                                       color: '#7c3aed',
                                       border: '1px solid #ddd6fe'
                                     }
-                                    : {})
+                                    : booking.bookingStatus?.toLowerCase() ===
+                                      'travelled'
+                                      ? {
+                                        backgroundColor: '#e0f2fe',
+                                        color: '#0284c7',
+                                        border: '1px solid #bae6fd'
+                                      }
+                                      : {})
                             }}
                           >
                             {booking.bookingStatus || 'Unknown'}

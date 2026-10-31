@@ -551,6 +551,8 @@ namespace FlightBookingBackend.Services
             var today = GetBusinessDate();
             var now = _timeProvider.GetUtcNow().UtcDateTime;
 
+            await BookingStatusTransitionHelper.UpdatePassedBookingsToTravelledAsync(_context, today);
+
             // 1. Permanently delete any coupons generated for cancelled bookings from the database
             var cancelledBookingCoupons = await _context.Coupons
                 .Include(c => c.CouponUsages)

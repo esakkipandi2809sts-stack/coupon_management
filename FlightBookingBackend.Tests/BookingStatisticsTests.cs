@@ -307,6 +307,55 @@ public class BookingStatisticsTests
         Class = "Economy"
     };
 
+    [Fact]
+    public async Task ConfirmedBookingChangesToTravelledWhenTravelDateHasPassed()
+    {
+        await using var connection = await OpenDatabaseAsync();
+        await using var context = CreateContext(connection);
+        await context.Database.EnsureCreatedAsync();
+
+        var user = CreateUser();
+        var pastFlight = CreateFlight("PAST-101", DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3));
+        var futureFlight = CreateFlight("FUT-102", DateOnly.FromDateTime(DateTime.UtcNow).AddDays(3));
+        context.AddRange(user, pastFlight, futureFlight);
+        await context.SaveChangesAsync();
+
+        var pastBooking = CreateBooking(user.Id, pastFlight.FlightId, "1A", BookingStatuses.Confirmed);
+        pastBooking.FlightJourneyDate = pastFlight.DepartureDate;
+
+        var futureBooking = CreateBooking(user.Id, futureFlight.FlightId, "1B", BookingStatuses.Confirmed);
+        futureBooking.FlightJourneyDate = futureFlight.DepartureDate;
+
+        var pastCancelled = CreateBooking(user.Id, pastFlight.FlightId, "1C", BookingStatuses.Cancelled);
+        pastCancelled.FlightJourneyDate = pastFlight.DepartureDate;
+
+        context.Bookings.AddRange(pastBooking, futureBooking, pastCancelled);
+        await context.SaveChangesAsync();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var changed = await BookingStatusTransitionHelper.UpdatePassedBookingsToTravelledAsync(context, today);
+
+        Assert.Equal(1, changed);
+
+        var updatedPast = await context.Bookings.FindAsync(pastBooking.BookingId);
+        var updatedFuture = await context.Bookings.FindAsync(futureBooking.BookingId);
+        var updatedCancelled = await context.Bookings.FindAsync(pastCancelled.BookingId);
+
+        Assert.Equal(BookingStatuses.Travelled, updatedPast!.BookingStatus);
+        Assert.Equal(BookingStatuses.Confirmed, updatedFuture!.BookingStatus);
+        Assert.Equal(BookingStatuses.Cancelled, updatedCancelled!.BookingStatus);
+
+        // BookingService should reject cancelling or rescheduling travelled bookings
+        var bookingService = new BookingService(context, new CouponService(context));
+        var (cancelSuccess, cancelMsg) = await bookingService.CancelBookingAsync(pastBooking.BookingId, user.Id);
+        Assert.False(cancelSuccess);
+        Assert.Contains("travelled", cancelMsg, StringComparison.OrdinalIgnoreCase);
+
+        var (reschedSuccess, reschedMsg, _) = await bookingService.RescheduleBookingDirectAsync(pastBooking.BookingId, user.Id);
+        Assert.False(reschedSuccess);
+        Assert.Contains("travelled", reschedMsg, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static Booking CreateBooking(int userId, int flightId, string seat, string status) => new()
     {
         BookingReference = $"TEST-{Guid.NewGuid():N}",
