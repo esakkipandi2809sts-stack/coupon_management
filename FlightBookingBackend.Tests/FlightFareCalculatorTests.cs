@@ -51,6 +51,35 @@ public class FlightFareCalculatorTests
     }
 
     [Fact]
+    public void FaresVaryAcrossDepartureTimesOnSameRoute()
+    {
+        const decimal distance = 1000m; // Base: 4000
+        var morningPeakFare = FlightFareCalculator.CalculateEconomyFare(distance, "09:30 AM", "AI-101", "Air India");
+        var eveningPeakFare = FlightFareCalculator.CalculateEconomyFare(distance, "06:30 PM", "AI-101", "Air India");
+        var afternoonFare = FlightFareCalculator.CalculateEconomyFare(distance, "02:00 PM", "AI-101", "Air India");
+        var lateNightFare = FlightFareCalculator.CalculateEconomyFare(distance, "11:30 PM", "AI-101", "Air India");
+
+        // Morning Peak and Evening Peak should be higher than Afternoon
+        Assert.True(morningPeakFare > afternoonFare, $"Morning peak {morningPeakFare} should exceed afternoon {afternoonFare}");
+        Assert.True(eveningPeakFare > afternoonFare, $"Evening peak {eveningPeakFare} should exceed afternoon {afternoonFare}");
+        // Afternoon should be higher than Late Night Red-Eye
+        Assert.True(afternoonFare > lateNightFare, $"Afternoon {afternoonFare} should exceed late night {lateNightFare}");
+    }
+
+    [Fact]
+    public void DifferentFlightsOnSameRouteHaveDistinctFares()
+    {
+        const decimal distance = 1000m;
+        var flight1 = FlightFareCalculator.CalculateEconomyFare(distance, "09:00 AM", "6E-201", "IndiGo");
+        var flight2 = FlightFareCalculator.CalculateEconomyFare(distance, "09:00 AM", "AI-805", "Air India");
+        var flight3 = FlightFareCalculator.CalculateEconomyFare(distance, "09:30 AM", "SG-412", "SpiceJet");
+
+        Assert.NotEqual(flight1, flight2);
+        Assert.NotEqual(flight2, flight3);
+        Assert.NotEqual(flight1, flight3);
+    }
+
+    [Fact]
     public void InvalidClassAndDistanceAreRejected()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => FlightFareCalculator.CalculateBaseFare(0m, "Economy"));

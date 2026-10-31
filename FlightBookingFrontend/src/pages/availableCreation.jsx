@@ -21,8 +21,6 @@ import {
 
 import { flightApi } from '../services/api';
 import {
-  calculateEconomyFare,
-  calculateItineraryFare,
   formatINR,
 } from '../utils/flightPricing';
 
@@ -32,6 +30,8 @@ import {
   formatDistance,
   getFlightDetails,
   isSameCity,
+  isValidDuration,
+  normalizeDurationDisplay,
   recalculateSegment,
   toTimestamp,
 } from '../utils/flightRoute';
@@ -104,7 +104,7 @@ const errorKey = (segment, field) => `${segment.key}.${field}`;
 const segmentFare = (segment) => {
   const p = parseFloat(segment?.price);
   if (!Number.isNaN(p) && p > 0) return Math.round(p);
-  return calculateEconomyFare(segment?.distanceKm);
+  return null;
 };
 
 function segmentLabel(tripType, index) {
@@ -131,10 +131,10 @@ function toPayload(segment) {
     distanceKm: parseFloat(segment.distanceKm),
     price: !Number.isNaN(priceVal) && priceVal > 0 ? Math.round(priceVal) : undefined,
     departureDate: segment.departureDate,
-    departureTime: segment.departureTime,
+    departureTime: segment.departureTime.trim(),
     arrivalDate: segment.arrivalDate,
-    arrivalTime: segment.arrivalTime,
-    duration: segment.duration.trim(),
+    arrivalTime: segment.arrivalTime.trim(),
+    duration: normalizeDurationDisplay(segment.duration) || segment.duration.trim(),
     totalSeats: parseInt(segment.totalSeats, 10),
     availableSeats: parseInt(segment.availableSeats, 10),
     status: segment.status,
@@ -178,6 +178,9 @@ function validateSegment(segment, today) {
   required('toCity', 'Flying To');
   required('departureDate', 'Departure Date');
   required('departureTime', 'Departure Time');
+  required('arrivalDate', 'Arrival Date');
+  required('arrivalTime', 'Arrival Time');
+  required('duration', 'Duration');
 
   if (segment.fromCity.trim() && segment.toCity.trim()) {
     if (isSameCity(segment.fromCity, segment.toCity)) {
@@ -198,28 +201,49 @@ function validateSegment(segment, today) {
     errs.distanceKm = 'Route distance is required.';
   }
 
+  const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 
   if (segment.departureDate && segment.departureDate < today) {
     errs.departureDate = 'Departure date must be today or later.';
   }
 
+  if (segment.departureTime && !TIME_REGEX.test(segment.departureTime.trim())) {
+    errs.departureTime = 'Please enter a valid departure time (HH:mm).';
+  }
+
+  if (segment.arrivalTime && !TIME_REGEX.test(segment.arrivalTime.trim())) {
+    errs.arrivalTime = 'Please enter a valid arrival time (HH:mm).';
+  }
+
+  if (segment.departureDate && segment.arrivalDate && segment.arrivalDate < segment.departureDate) {
+    errs.arrivalDate = 'Arrival date cannot be earlier than departure date.';
+  }
+
   if (
     segment.departureDate &&
     segment.arrivalDate &&
+    segment.departureTime &&
+    segment.arrivalTime &&
+    TIME_REGEX.test(segment.departureTime.trim()) &&
+    TIME_REGEX.test(segment.arrivalTime.trim()) &&
     toTimestamp(segment.arrivalDate, segment.arrivalTime) <=
     toTimestamp(segment.departureDate, segment.departureTime)
   ) {
-    errs.arrivalDate = 'Arrival must be after departure.';
+    errs.arrivalTime = 'Arrival must be after departure time.';
+  }
+
+  if (segment.duration && !isValidDuration(segment.duration)) {
+    errs.duration = 'Please enter a valid duration (e.g. 2h 15m or 135m).';
   }
 
   const total = parseInt(segment.totalSeats, 10);
   const available = parseInt(segment.availableSeats, 10);
   const priceVal = parseFloat(segment.price);
 
-  if (segment.price === '' || segment.price === undefined || segment.price === null) {
-    errs.price = 'Flight Price is required.';
+  if (segment.price === '' || segment.price === undefined || segment.price === null || !String(segment.price).trim()) {
+    errs.price = 'Price is required.';
   } else if (Number.isNaN(priceVal) || priceVal <= 0) {
-    errs.price = 'Flight Price must be a positive number.';
+    errs.price = 'Price must be greater than zero.';
   }
 
   if (segment.totalSeats === '') {
@@ -496,8 +520,7 @@ function SegmentForm({
           <input
             {...input('arrivalDate', {
               type: 'date',
-              readOnly: true,
-              tabIndex: -1,
+              min: segment.departureDate || minDepartureDate || today,
             })}
           />
         </Field>
@@ -511,8 +534,6 @@ function SegmentForm({
           <input
             {...input('arrivalTime', {
               type: 'time',
-              readOnly: true,
-              tabIndex: -1,
             })}
           />
         </Field>
@@ -525,9 +546,8 @@ function SegmentForm({
         >
           <input
             {...input('duration', {
-              placeholder: 'Calculated from the route',
-              readOnly: true,
-              tabIndex: -1,
+              placeholder: 'e.g. 2h 15m',
+              autoComplete: 'off',
             })}
           />
         </Field>
@@ -571,9 +591,7 @@ function SegmentForm({
               type: 'number',
               min: 1,
               step: 'any',
-              placeholder: segment.distanceKm
-                ? `e.g. ${calculateEconomyFare(segment.distanceKm) || 3500}`
-                : 'e.g. 3500',
+              placeholder: 'e.g. 4500',
             })}
           />
         </Field>
@@ -719,20 +737,16 @@ export default function AvailableCreation() {
       timingFields.includes(name)
     ) {
       list[index] = recalculateSegment(list[index]);
-
-      if (routeFields.includes(name)) {
-        const autoFare = calculateEconomyFare(list[index].distanceKm);
-        if (autoFare) {
-          list[index].price = String(autoFare);
-        }
-      }
     }
 
     clearErrorsFor(list[index], [
       name,
       'distanceKm',
+      'departureTime',
       'arrivalDate',
-      ...(name === 'price' ? ['price'] : []),
+      'arrivalTime',
+      'duration',
+      'price',
       ...(routeFields.includes(name) ? routeFields : []),
     ]);
 
@@ -747,11 +761,6 @@ export default function AvailableCreation() {
         fromCity: list[0].toCity,
         toCity: list[0].fromCity,
       });
-
-      if (!list[1].price || list[1].price === '') {
-        const retFare = calculateEconomyFare(list[1].distanceKm);
-        if (retFare) list[1].price = String(retFare);
-      }
 
       clearErrorsFor(list[1], [
         'fromCity',
@@ -1250,7 +1259,7 @@ export default function AvailableCreation() {
 
             {totalFare === null ? (
               <span className="ac-total-note">
-                Select every route to calculate the total.
+                Enter prices for all flights to calculate total fare.
               </span>
             ) : (
               <span className="ac-total-value">
@@ -1320,11 +1329,13 @@ export default function AvailableCreation() {
             <table className="ac-flights-table">
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'center' }}>Travel Place</th>
-                  <th style={{ textAlign: 'center' }}>Flight Number</th>
-                  <th style={{ textAlign: 'center' }}>Booking Date</th>
-                  <th style={{ textAlign: 'center' }}>Departure Date</th>
-                  <th style={{ textAlign: 'center' }}>Price</th>
+                  <th style={{ textAlign: 'left' }}>Flight</th>
+                  <th style={{ textAlign: 'left' }}>Route</th>
+                  <th style={{ textAlign: 'center' }}>Departure</th>
+                  <th style={{ textAlign: 'center' }}>Arrival</th>
+                  <th style={{ textAlign: 'center' }}>Duration</th>
+                  <th style={{ textAlign: 'right' }}>Price</th>
+                  <th style={{ textAlign: 'center' }}>Seats</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
                   <th style={{ textAlign: 'center' }}>Trip Type</th>
                   <th style={{ textAlign: 'center' }}>Created By</th>
@@ -1335,21 +1346,48 @@ export default function AvailableCreation() {
               <tbody>
                 {sortedFlights.map((flight) => (
                   <tr key={flight.flightId}>
-                    <td>
+                    <td style={{ textAlign: 'left' }}>
                       <strong>{flight.flightNumber}</strong>
+                      {flight.airline && (
+                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                          {flight.airline}
+                        </div>
+                      )}
                     </td>
 
-                    <td>
-                      <div>{flight.fromCity} → {flight.toCity}</div>
+                    <td style={{ textAlign: 'left' }}>
+                      <div style={{ fontWeight: 600 }}>
+                        {flight.fromCity} → {flight.toCity}
+                      </div>
                     </td>
 
-                    <td>{flight.departureDate || '—'}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div>{flight.departureDate || '—'}</div>
+                      <strong style={{ color: '#0f172a' }}>{flight.departureTime || '—'}</strong>
+                    </td>
 
-                    <td>{flight.departureTime || '—'}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div>{flight.arrivalDate || '—'}</div>
+                      <strong style={{ color: '#0f172a' }}>{flight.arrivalTime || '—'}</strong>
+                    </td>
 
-                    <td>{formatINR(flight.price)}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span className="ac-chip" style={{ background: '#f1f5f9', color: '#334155' }}>
+                        {normalizeDurationDisplay(flight.duration) || flight.duration || '—'}
+                      </span>
+                    </td>
 
-                    <td>
+                    <td style={{ textAlign: 'right' }}>
+                      <strong style={{ color: '#0284c7', fontSize: '0.98rem' }}>
+                        {formatINR(flight.price)}
+                      </strong>
+                    </td>
+
+                    <td style={{ textAlign: 'center', fontSize: '0.84rem' }}>
+                      {flight.availableSeats ?? '—'} / {flight.totalSeats ?? '—'}
+                    </td>
+
+                    <td style={{ textAlign: 'center' }}>
                       <span
                         className={`ac-flight-status ${String(flight.status || '')
                             .toLowerCase()
@@ -1360,7 +1398,7 @@ export default function AvailableCreation() {
                       </span>
                     </td>
 
-                    <td>{describeFlight(flight)}</td>
+                    <td style={{ textAlign: 'center' }}>{describeFlight(flight)}</td>
 
                     <td style={{ textAlign: 'center' }}>
                       {flight.createdByUserName || '-'}

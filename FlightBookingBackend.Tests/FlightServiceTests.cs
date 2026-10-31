@@ -125,7 +125,8 @@ public class FlightServiceTests
 
         Assert.True(created.FlightId > 0);
         Assert.Equal(1, await context.Flights.CountAsync());
-        Assert.Equal(1500m, await context.Flights.Select(f => f.Price).SingleAsync());
+        var expectedPrice = FlightFareCalculator.CalculateEconomyFare(request.DistanceKm, request.DepartureTime, request.FlightNumber, request.Airline);
+        Assert.Equal(expectedPrice, await context.Flights.Select(f => f.Price).SingleAsync());
         Assert.Equal(0, created.StopCount);
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateFlightAsync(request));
         Assert.Equal(1, await context.Flights.CountAsync());
@@ -278,8 +279,9 @@ public class FlightServiceTests
         Assert.NotNull(updated);
         Assert.Equal("UPD-101", updated!.FlightNumber);
         Assert.Equal("Mumbai", updated.FromCity);
-        Assert.Equal(2000m, updated.Price);
-        Assert.Equal(2000m, (await context.Flights.SingleAsync()).Price);
+        var expectedPrice = FlightFareCalculator.CalculateEconomyFare(500m, "12:00", "UPD-101", "Updated Airways");
+        Assert.Equal(expectedPrice, updated.Price);
+        Assert.Equal(expectedPrice, (await context.Flights.SingleAsync()).Price);
     }
 
     [Fact]
@@ -353,7 +355,8 @@ public class FlightServiceTests
 
         var flights = await new FlightService(context).GetFlightsByRouteAsync("Chennai", "Bangalore");
 
-        Assert.Equal(1500m, Assert.Single(flights).Price);
+        var expectedPrice = FlightFareCalculator.ResolveBaseFare(100m, "10:00", "TEST-456", "Test Airways");
+        Assert.Equal(expectedPrice, Assert.Single(flights).Price);
     }
 
     [Fact]

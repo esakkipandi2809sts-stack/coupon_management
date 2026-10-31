@@ -23,6 +23,24 @@ import { authUtil } from '../utils/auth';
 const formatDate = (dateValue) => {
   if (!dateValue) return '—';
 
+  if (typeof dateValue === 'string') {
+    if (dateValue.startsWith('0001-01-01')) {
+      return '—';
+    }
+    const match = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [, y, m, d] = match;
+      const localDate = new Date(Number(y), Number(m) - 1, Number(d));
+      if (!Number.isNaN(localDate.getTime())) {
+        return localDate.toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        });
+      }
+    }
+  }
+
   const date = new Date(dateValue);
 
   if (Number.isNaN(date.getTime())) {
@@ -36,6 +54,21 @@ const formatDate = (dateValue) => {
   });
 };
 
+// Support travel date fields returned by the booking API.
+const getTravelDate = (booking) => {
+  const candidate =
+    booking.travelDate ||
+    booking.flightJourneyDate ||
+    booking.departureDate ||
+    booking.flight?.departureDate ||
+    null;
+
+  if (typeof candidate === 'string' && candidate.startsWith('0001-01-01')) {
+    return null;
+  }
+  return candidate;
+};
+
 // Support the cancellation date field returned by the existing API.
 const getCancelDate = (booking) => {
   return (
@@ -45,6 +78,20 @@ const getCancelDate = (booking) => {
     booking.canceledDate ??
     null
   );
+};
+
+// Support the reschedule date field returned by the booking API.
+const getRescheduleDate = (booking) => {
+  const candidate =
+    booking.rescheduleDate ??
+    booking.rescheduledDate ??
+    booking.reschedulingDate ??
+    null;
+
+  if (typeof candidate === 'string' && candidate.startsWith('0001-01-01')) {
+    return null;
+  }
+  return candidate;
 };
 
 export default function Dashboard() {
@@ -881,9 +928,12 @@ export default function Dashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {recentBookings.map((booking) => {
                   const cancelDate = getCancelDate(booking);
+                  const rescheduleDate = getRescheduleDate(booking);
 
                   const isCancelled =
                     booking.bookingStatus?.toLowerCase() === 'cancelled';
+                  const isRescheduled =
+                    booking.bookingStatus?.toLowerCase() === 'rescheduled';
 
                   return (
                     <div
@@ -974,6 +1024,10 @@ export default function Dashboard() {
                           minWidth: '145px'
                         }}
                       >
+                        <div style={{ color: '#64748b' }}>
+                          Booking Date: {formatDate(booking.bookingDate)}
+                        </div>
+
                         {isCancelled && cancelDate && (
                           <div
                             style={{
@@ -986,9 +1040,30 @@ export default function Dashboard() {
                           </div>
                         )}
 
-                        <div style={{ color: '#64748b' }}>
-                          Booking Date: {formatDate(booking.bookingDate)}
-                        </div>
+                        {isRescheduled && rescheduleDate && formatDate(rescheduleDate) !== formatDate(getTravelDate(booking)) && (
+                          <div
+                            style={{
+                              color: '#7c3aed',
+                              fontWeight: 600,
+                              marginBottom: '5px'
+                            }}
+                          >
+                            Reschedule Date: {formatDate(rescheduleDate)}
+                          </div>
+                        )}
+
+                        {isRescheduled ? (
+                          <div style={{ color: '#7c3aed' }}>
+                            {rescheduleDate && formatDate(rescheduleDate) !== formatDate(getTravelDate(booking))
+                              ? `Travel Date: ${formatDate(getTravelDate(booking))}`
+                              : `Reschedule Date: ${formatDate(rescheduleDate || getTravelDate(booking))}`}
+                          </div>
+                        ) : (
+                          <div style={{ color: '#059669' }}>
+                            Travel Date: {formatDate(getTravelDate(booking))}
+                          </div>
+                        )}
+
                       </div>
                     </div>
                   );

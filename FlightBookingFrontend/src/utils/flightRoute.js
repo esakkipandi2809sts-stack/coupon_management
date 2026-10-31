@@ -160,12 +160,89 @@ export function formatDuration(durationOrMinutes) {
 }
 
 /**
+ * Formats distance in kilometers as a clean badge: e.g. "990 km" or "1,760 km".
+ */
+export function formatDistanceKm(distanceKm) {
+  const dist = Number(distanceKm);
+  if (!Number.isFinite(dist) || dist <= 0) return '';
+  return `${Math.round(dist).toLocaleString()} km`;
+}
+
+/**
  * Formats distance in kilometers: e.g. "Approximately 1,760 km".
  */
 export function formatDistance(distanceKm) {
   const dist = Number(distanceKm);
   if (!Number.isFinite(dist) || dist <= 0) return 'Distance unavailable';
   return `Approximately ${Math.round(dist).toLocaleString()} km`;
+}
+
+/**
+ * Formats stops in authentic airline booking format: "Non-stop", "1 Stop", "2 Stops".
+ */
+export function formatStops(stopCount) {
+  const count = Number(stopCount);
+  if (!Number.isFinite(count) || count <= 0) return 'Non-stop';
+  if (count === 1) return '1 Stop';
+  return `${count} Stops`;
+}
+
+/**
+ * Standard 3-letter IATA airport codes for major Indian and international destinations.
+ */
+export const CITY_AIRPORT_CODES = {
+  delhi: 'DEL',
+  mumbai: 'BOM',
+  bengaluru: 'BLR',
+  bangalore: 'BLR',
+  chennai: 'MAA',
+  kolkata: 'CCU',
+  hyderabad: 'HYD',
+  goa: 'GOI',
+  ahmedabad: 'AMD',
+  pune: 'PNQ',
+  kochi: 'COK',
+  calicut: 'CCJ',
+  thiruvananthapuram: 'TRV',
+  trivandrum: 'TRV',
+  jaipur: 'JAI',
+  lucknow: 'LKO',
+  chandigarh: 'IXC',
+  amritsar: 'ATQ',
+  guwahati: 'GAU',
+  patna: 'PAT',
+  bhubaneswar: 'BBI',
+  indore: 'IDR',
+  varanasi: 'VNS',
+  coimbatore: 'CJB',
+  madurai: 'IXM',
+  tiruchirappalli: 'TRZ',
+  trichy: 'TRZ',
+  mangalore: 'IXE',
+  visakhapatnam: 'VTZ',
+  vizag: 'VTZ',
+  dehradun: 'DED',
+  ranchi: 'IXR',
+  raipur: 'RPR',
+  surat: 'STV',
+  vadodara: 'BDQ',
+  bhopal: 'BHO',
+  udaipur: 'UDR',
+  jammu: 'IXJ',
+  srinagar: 'SXR',
+};
+
+/**
+ * Resolves standard 3-letter airport code for a city.
+ */
+export function getAirportCode(city, existingCode) {
+  const code = String(existingCode || '').trim().toUpperCase();
+  if (code.length === 3 && /^[A-Z]{3}$/.test(code)) {
+    return code;
+  }
+  const norm = normalizeCity(city);
+  const alias = CITY_ALIASES[norm] || norm;
+  return CITY_AIRPORT_CODES[alias] || CITY_AIRPORT_CODES[norm] || (city ? city.slice(0, 3).toUpperCase() : 'APT');
 }
 
 /**
@@ -191,7 +268,7 @@ export function determineFlightType(stopCount) {
 }
 
 /**
- * Normalizes duration string to ensure standard format in hours and minutes.
+ * Normalizes duration string to ensure standard MakeMyTrip format in hours and minutes (e.g. 2h 15m).
  */
 export function normalizeDurationDisplay(text, distanceKm) {
   const trimmed = String(text || '').trim();
@@ -199,27 +276,59 @@ export function normalizeDurationDisplay(text, distanceKm) {
     return distanceKm ? formatDurationRange(distanceKm) : 'Duration unavailable';
   }
 
+  // E.g. "135" or "135m"
+  if (/^\d+$/.test(trimmed)) {
+    const mins = parseInt(trimmed, 10);
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    const parts = [];
+    if (h > 0) parts.push(`${h}h`);
+    if (m > 0) parts.push(`${m}m`);
+    return parts.join(' ') || '0m';
+  }
+
   const rangeMatch = trimmed.match(/^(.+?)\s*[–-]\s*(.+)$/);
   if (rangeMatch) {
     return normalizeDurationDisplay(rangeMatch[1]);
   }
 
-  const match = trimmed.match(/^(?:(\d+)\s*h(?:r|ours?)?)?\s*(?:(\d+)\s*m(?:in(?:utes?)?)?)?$/i);
+  const match = trimmed.match(/^(?:(\d+)\s*(?:h|hr|hrs|hours?))?\s*(?:(\d+)\s*(?:m|min|mins|minutes?))?$/i);
   if (match && (match[1] || match[2])) {
     const hours = match[1] ? Number(match[1]) : 0;
     const mins = match[2] ? Number(match[2]) : 0;
     const parts = [];
-    if (hours > 0) parts.push(`${hours} hr`);
-    if (mins > 0) parts.push(`${mins} min`);
-    return parts.join(' ') || '0 min';
+    if (hours > 0) parts.push(`${hours}h`);
+    if (mins > 0) parts.push(`${mins}m`);
+    return parts.join(' ') || '0m';
   }
 
   return trimmed;
 }
 
 /**
+ * Validates that a duration string is in a recognized, positive format
+ * e.g. "2h 15m", "2h", "45m", "2 hr 15 min", "135m".
+ */
+export function isValidDuration(value) {
+  if (!value || typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/^\d+$/.test(trimmed)) {
+    return parseInt(trimmed, 10) > 0;
+  }
+  const match = trimmed.match(/^(?:(\d+)\s*(?:h|hr|hrs|hours?))?\s*(?:(\d+)\s*(?:m|min|mins|minutes?))?$/i);
+  if (match && (match[1] || match[2])) {
+    const hours = match[1] ? parseInt(match[1], 10) : 0;
+    const minutes = match[2] ? parseInt(match[2], 10) : 0;
+    return hours * 60 + minutes > 0;
+  }
+  return false;
+}
+
+/**
  * Returns complete flight details object with calculated distance, stop count,
  * flight type and duration in the expected format.
+ * Manually entered duration is always prioritized over distance-based estimates.
  */
 export function getFlightDetails(flightOrSegment) {
   const fromCity = String(flightOrSegment?.fromCity || '').trim();
@@ -239,9 +348,12 @@ export function getFlightDetails(flightOrSegment) {
   const stopCount = determineStopCount(flightOrSegment);
   const flightType = determineFlightType(stopCount);
 
-  let durationDisplay = distanceKm ? formatDurationRange(distanceKm) : '';
-  if (!durationDisplay) {
-    durationDisplay = normalizeDurationDisplay(flightOrSegment?.duration, distanceKm);
+  let durationDisplay = '';
+  if (flightOrSegment?.duration && String(flightOrSegment.duration).trim()) {
+    durationDisplay = normalizeDurationDisplay(flightOrSegment.duration);
+  }
+  if (!durationDisplay && distanceKm) {
+    durationDisplay = formatDurationRange(distanceKm);
   }
 
   const distanceDisplay = distanceKm > 0 ? formatDistance(distanceKm) : 'Distance unavailable';
@@ -287,8 +399,8 @@ export function toTimestamp(date, time) {
 }
 
 /**
- * Recalculates distance, duration, stop count, flight type and arrival for a segment
- * from its current cities, departure date and departure time.
+ * Recalculates route distance, stop count, and flight type for a segment from its current cities.
+ * Departure Time, Arrival Time, Duration, and Price are entered manually by the user.
  */
 export function recalculateSegment(segment) {
   const next = { ...segment };
@@ -301,39 +413,24 @@ export function recalculateSegment(segment) {
     return {
       ...next,
       distanceKm: '',
-      arrivalDate: '',
-      arrivalTime: '',
-      duration: '',
       stopCount: currentStopCount,
       flightType: currentFlightType,
     };
   }
-
-  if (!next.departureTime) next.departureTime = DEFAULT_DEPARTURE_TIME;
 
   const distanceKm = isSameCity(fromCity, toCity) ? null : calculateRouteDistance(fromCity, toCity);
   if (distanceKm === null) {
     return {
       ...next,
       distanceKm: '',
-      arrivalDate: '',
-      arrivalTime: '',
-      duration: '',
       stopCount: currentStopCount,
       flightType: currentFlightType,
     };
   }
 
-  const durationRange = formatDurationRange(distanceKm);
-  const durationMinutes = getDurationMinutes(distanceKm);
-  const arrival = calculateArrival(next.departureDate, next.departureTime, durationMinutes);
-
   return {
     ...next,
     distanceKm: String(distanceKm),
-    duration: durationRange,
-    arrivalDate: arrival.arrivalDate,
-    arrivalTime: arrival.arrivalTime,
     stopCount: currentStopCount,
     flightType: currentFlightType,
   };

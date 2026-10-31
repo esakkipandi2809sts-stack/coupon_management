@@ -311,7 +311,7 @@ namespace FlightBookingBackend.Services
 
             var baseFare = flight.Price > 0m
                 ? flight.Price
-                : FlightFareCalculator.ResolveBaseFare(flight.DistanceKm);
+                : FlightFareCalculator.ResolveBaseFare(flight.DistanceKm, flight.DepartureTime, flight.FlightNumber, flight.Airline);
             if (baseFare <= 0m)
             {
                 return new CouponValidationResultDto

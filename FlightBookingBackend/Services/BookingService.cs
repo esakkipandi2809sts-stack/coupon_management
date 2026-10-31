@@ -73,7 +73,7 @@ namespace FlightBookingBackend.Services
             // multiplier once, then multiply by the requested passenger count.
             var originalBaseFare = flight.Price > 0m
                 ? flight.Price
-                : FlightFareCalculator.CalculateEconomyFare(distanceKm);
+                : FlightFareCalculator.CalculateEconomyFare(distanceKm, flight.DepartureTime, flight.FlightNumber, flight.Airline);
             var farePerPassenger = (int)Math.Round(FlightFareCalculator.CalculateClassFare(originalBaseFare, dto.Class), 0, MidpointRounding.AwayFromZero);
             var baseFare = (int)Math.Round(farePerPassenger * (decimal)dto.PassengerCount, 0, MidpointRounding.AwayFromZero);
             var taxes = 0m;
@@ -740,7 +740,7 @@ namespace FlightBookingBackend.Services
             // Calculate new fare for the chosen flight, preserving passenger count and class multiplier.
             var newBaseEconomyFare = newFlight.Price > 0m
                 ? newFlight.Price
-                : FlightFareCalculator.ResolveBaseFare(newFlight.DistanceKm);
+                : FlightFareCalculator.ResolveBaseFare(newFlight.DistanceKm, newFlight.DepartureTime, newFlight.FlightNumber, newFlight.Airline);
             var newFarePerPassenger = (int)Math.Round(FlightFareCalculator.CalculateClassFare(newBaseEconomyFare, booking.Class), 0, MidpointRounding.AwayFromZero);
             var newTotalBaseFare = (int)Math.Round(newFarePerPassenger * (decimal)booking.PassengerCount, 0, MidpointRounding.AwayFromZero);
             var discount = booking.DiscountAmount;
@@ -758,6 +758,7 @@ namespace FlightBookingBackend.Services
             booking.TicketPrice = newTicketPrice;
             booking.SeatNumber = seatNumber;
             booking.BookingStatus = BookingStatuses.Rescheduled;
+            booking.RescheduleDate = DateTime.UtcNow;
 
             if (!string.IsNullOrWhiteSpace(booking.PassengerDetails))
             {
@@ -819,6 +820,7 @@ namespace FlightBookingBackend.Services
             }
 
             booking.BookingStatus = BookingStatuses.Rescheduled;
+            booking.RescheduleDate = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             var updated = await GetBookingByIdAsync(bookingId, userId);
@@ -840,7 +842,7 @@ namespace FlightBookingBackend.Services
             var distanceKm = b.DistanceKm ?? b.Flight?.DistanceKm;
             var economyFare = b.Flight != null && b.Flight.Price > 0m
                 ? b.Flight.Price
-                : FlightFareCalculator.ResolveBaseFare(distanceKm);
+                : FlightFareCalculator.ResolveBaseFare(distanceKm, b.Flight?.DepartureTime, b.Flight?.FlightNumber, b.Flight?.Airline);
             var calculatedFare = economyFare > 0m
                 ? FlightFareCalculator.CalculateClassFare(economyFare, b.Class)
                 : final;
@@ -884,6 +886,7 @@ namespace FlightBookingBackend.Services
                 BookingStatus = b.BookingStatus,
                 PaymentStatus = b.PaymentStatus,
                 CancelDate = b.CancelDate,
+                RescheduleDate = b.RescheduleDate,
                 FlightNumber = b.Flight?.FlightNumber ?? "N/A",
                 Airline = b.Flight?.Airline ?? "N/A",
                 FromCity = b.Flight?.FromCity ?? "N/A",

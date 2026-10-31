@@ -86,6 +86,9 @@ namespace FlightBookingBackend.Models
         [Column(TypeName = "datetime2")]
         public DateTime? CancelDate { get; set; }
 
+        [Column(TypeName = "datetime2")]
+        public DateTime? RescheduleDate { get; set; }
+
         // Foreign keys and Navigation properties
         [ForeignKey("UserId")]
         public virtual User? User { get; set; }

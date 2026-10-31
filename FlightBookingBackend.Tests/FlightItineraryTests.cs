@@ -61,7 +61,7 @@ public class FlightItineraryTests
         Assert.Null(saved.SegmentOrder);
         Assert.Equal("admin@example.com", saved.CreatedByUserName);
         Assert.Equal(saved.Price, result.TotalFare);
-        Assert.Equal(FlightFareCalculator.ResolveBaseFare(saved.DistanceKm), saved.Price);
+        Assert.Equal(FlightFareCalculator.ResolveBaseFare(saved.DistanceKm, saved.DepartureTime, saved.FlightNumber, saved.Airline), saved.Price);
     }
 
     [Fact]

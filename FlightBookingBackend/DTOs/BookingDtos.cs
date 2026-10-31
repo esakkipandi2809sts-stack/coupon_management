@@ -100,6 +100,7 @@ namespace FlightBookingBackend.DTOs
         public string BookingStatus { get; set; } = string.Empty;
         public string PaymentStatus { get; set; } = string.Empty;
         public DateTime? CancelDate { get; set; }
+        public DateTime? RescheduleDate { get; set; }
 
         // Flight details
         public string FlightNumber { get; set; } = string.Empty;

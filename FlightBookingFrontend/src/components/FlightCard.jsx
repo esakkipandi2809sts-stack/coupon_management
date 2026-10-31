@@ -7,14 +7,39 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
+  MapPin,
   Plane,
   PlaneTakeoff,
   ShieldCheck,
   Users,
 } from 'lucide-react';
-import { calculateClassFare, formatINR, getClassMultiplier } from '../utils/flightPricing';
-import { getFlightDetails } from '../utils/flightRoute';
+import { calculateEconomyFare, calculateClassFare, formatINR } from '../utils/flightPricing';
+import {
+  formatDistanceKm,
+  formatStops,
+  getAirportCode,
+  getFlightDetails,
+  normalizeDurationDisplay,
+} from '../utils/flightRoute';
 import './FlightCard.css';
+
+const AIRLINE_THEMES = {
+  indigo: { bg: '#001b94', color: '#fff', code: '6E', name: 'IndiGo' },
+  spicejet: { bg: '#e81e25', color: '#fff', code: 'SG', name: 'SpiceJet' },
+  'air india': { bg: '#ed1b24', color: '#fef08a', code: 'AI', name: 'Air India' },
+  vistara: { bg: '#501538', color: '#fcd34d', code: 'UK', name: 'Vistara' },
+  'akasa air': { bg: '#ff6600', color: '#fff', code: 'QP', name: 'Akasa Air' },
+  akasa: { bg: '#ff6600', color: '#fff', code: 'QP', name: 'Akasa Air' },
+};
+
+function getAirlineTheme(airlineName) {
+  const norm = String(airlineName || '').trim().toLowerCase();
+  for (const [key, theme] of Object.entries(AIRLINE_THEMES)) {
+    if (norm.includes(key)) return theme;
+  }
+  const code = (airlineName ? airlineName.slice(0, 2) : 'FL').toUpperCase();
+  return { bg: '#0284c7', color: '#fff', code, name: airlineName || 'Airline' };
+}
 
 function getFlightDate(dateValue) {
   if (!dateValue) return null;
@@ -58,12 +83,7 @@ function getSchedule(flight) {
   const departureDate = getFlightDate(flight.departureDate);
   const arrivalDate = getFlightDate(flight.arrivalDate);
   const durationText = String(flight.duration || '').trim();
-  const durationMatch = durationText.match(/^(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?$/i);
-  const duration = durationMatch && (durationMatch[1] || durationMatch[2])
-    ? [durationMatch[1] ? `${durationMatch[1]}h` : '', durationMatch[2] ? `${durationMatch[2]}m` : '']
-      .filter(Boolean)
-      .join(' ')
-    : durationText || 'Duration unavailable';
+  const duration = normalizeDurationDisplay(durationText) || durationText || 'Duration unavailable';
   const calendarDayOffset = departureDate && arrivalDate
     ? Math.round((arrivalDate.getTime() - departureDate.getTime()) / 86400000)
     : 0;
@@ -74,16 +94,14 @@ function getSchedule(flight) {
   };
 }
 
-function formatAirport(code, city) {
-  const airportCode = String(code || '').trim().toUpperCase();
-  return airportCode || city || 'Airport unavailable';
-}
-
 export default function FlightCard({ flight, couponCode, selectedCabin = 'All', passengerCount = 1 }) {
   const navigate = useNavigate();
   const [openPanel, setOpenPanel] = useState(null);
 
-  const baseFare = Number(flight.price);
+  const rawPrice = Number(flight.price);
+  const baseFare = rawPrice > 0
+    ? rawPrice
+    : calculateEconomyFare(flight.distanceKm, flight.departureTime, flight.flightNumber, flight.airline);
   const bookingClass = selectedCabin === 'All' ? 'Economy' : selectedCabin;
   const fare = calculateClassFare(baseFare, bookingClass);
   const totalFare = fare === null ? null : fare * Math.max(1, Number(passengerCount) || 1);
@@ -92,10 +110,13 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
   const schedule = getSchedule(flight);
   const flightDetails = getFlightDetails(flight);
   const logoUrl = flight.airlineLogoUrl || flight.logoUrl || '';
-  const departureLocation = formatAirport(flight.fromAirportCode, flight.fromCity);
-  const arrivalLocation = formatAirport(flight.toAirportCode, flight.toCity);
+  const airlineTheme = getAirlineTheme(flight.airline);
+  const departureAirport = getAirportCode(flight.fromCity, flight.fromAirportCode);
+  const arrivalAirport = getAirportCode(flight.toCity, flight.toAirportCode);
   const dateDifference = schedule.dayOffset > 0 ? `+${schedule.dayOffset} day${schedule.dayOffset === 1 ? '' : 's'}` : '';
-  const stopsLabel = flightDetails.flightType;
+  const stopsText = formatStops(flight.stopCount);
+  const distanceKm = flight.distanceKm || flightDetails.distanceKm;
+  const distanceText = formatDistanceKm(distanceKm);
 
   const handleSelect = () => {
     if (!canBook) return;
@@ -119,8 +140,13 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
         {logoUrl ? (
           <img className="flight-ticket-logo" src={logoUrl} alt={`${flight.airline} logo`} />
         ) : (
-          <div className="flight-ticket-logo-fallback" aria-hidden="true">
-            <Plane size={20} />
+          <div
+            className="flight-ticket-airline-badge"
+            style={{ backgroundColor: airlineTheme.bg, color: airlineTheme.color }}
+            aria-label={flight.airline}
+            title={flight.airline}
+          >
+            <span>{airlineTheme.code}</span>
           </div>
         )}
         <div className="flight-ticket-airline-copy">
@@ -131,15 +157,15 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
 
       <section className="flight-ticket-point flight-ticket-departure" aria-label="Departure">
         <strong className="flight-ticket-time">{formatTime(flight.departureTime)}</strong>
-        <strong className="flight-ticket-airport">{departureLocation}</strong>
-        {flight.fromAirportCode && <span className="flight-ticket-city">{flight.fromCity}</span>}
+        <strong className="flight-ticket-airport">{departureAirport}</strong>
+        <span className="flight-ticket-city">{flight.fromCity}</span>
         <span className="flight-ticket-date">
           <CalendarDays size={13} />
           {formatDay(flight.departureDate)}, {formatDate(flight.departureDate)}
         </span>
       </section>
 
-      <section className="flight-ticket-route" aria-label="Flight duration and stops">
+      <section className="flight-ticket-route" aria-label="Flight duration, distance, and stops">
         <span className="flight-ticket-duration">
           <Clock3 size={13} />
           {flightDetails.duration}
@@ -149,18 +175,24 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
           <Plane size={15} />
           <span />
         </div>
-        <span className="flight-ticket-stops">
-          {stopsLabel}
+        <span className={`flight-ticket-stops ${flight.stopCount > 0 ? 'flight-ticket-stops-connecting' : 'flight-ticket-stops-direct'}`}>
+          {stopsText}
         </span>
+        {distanceText && (
+          <span className="flight-ticket-distance" title="Route distance in kilometers">
+            <MapPin size={11} />
+            {distanceText}
+          </span>
+        )}
       </section>
 
       <section className="flight-ticket-point flight-ticket-arrival" aria-label="Arrival">
         <strong className="flight-ticket-time">{formatTime(flight.arrivalTime)}</strong>
         <strong className="flight-ticket-airport">
-          {arrivalLocation}
+          {arrivalAirport}
           {dateDifference && <sup className="flight-ticket-day-offset">{dateDifference}</sup>}
         </strong>
-        {flight.toAirportCode && <span className="flight-ticket-city">{flight.toCity}</span>}
+        <span className="flight-ticket-city">{flight.toCity}</span>
         <span className="flight-ticket-date">
           <CalendarDays size={13} />
           {formatDay(flight.arrivalDate)}, {formatDate(flight.arrivalDate)}

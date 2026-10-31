@@ -18,7 +18,92 @@ namespace FlightBookingBackend.Data
             // 2. Ensure every user has a UserCouponCount record and accurate counts in database.
             EnsureUserCouponCounts(context);
 
-            // Flights are created through the authenticated flight management API.
+            // 3. Ensure realistic flights for top routes if none currently exist.
+            EnsureRealisticSeedFlights(context);
+        }
+
+        private static void EnsureRealisticSeedFlights(FlightBookingDbContext context)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            if (context.Flights.Any(f => f.DepartureDate >= today))
+            {
+                return;
+            }
+
+            var sampleRoutes = new[]
+            {
+                ("Delhi", "Mumbai"),
+                ("Mumbai", "Delhi"),
+                ("Bengaluru", "Delhi"),
+                ("Chennai", "Delhi"),
+                ("Mumbai", "Goa")
+            };
+
+            var schedules = new[]
+            {
+                new { Airline = "IndiGo", FlightNumber = "6E-204", Dep = "06:00", Stops = 0, Seats = 180, Avail = 142 },
+                new { Airline = "SpiceJet", FlightNumber = "SG-8169", Dep = "08:15", Stops = 0, Seats = 189, Avail = 98 },
+                new { Airline = "Air India", FlightNumber = "AI-504", Dep = "11:30", Stops = 0, Seats = 168, Avail = 112 },
+                new { Airline = "IndiGo", FlightNumber = "6E-651", Dep = "14:00", Stops = 1, Seats = 180, Avail = 76 },
+                new { Airline = "Vistara", FlightNumber = "UK-833", Dep = "17:45", Stops = 0, Seats = 158, Avail = 54 },
+                new { Airline = "SpiceJet", FlightNumber = "SG-372", Dep = "20:30", Stops = 0, Seats = 189, Avail = 135 }
+            };
+
+            var toAdd = new List<Flight>();
+
+            for (int dayOffset = 0; dayOffset <= 2; dayOffset++)
+            {
+                var depDate = today.AddDays(dayOffset);
+
+                foreach (var (from, to) in sampleRoutes)
+                {
+                    var distance = RouteDistanceCalculator.TryCalculate(from, to) ?? 850m;
+                    int directMin = (int)Math.Max(40, Math.Round(((double)distance / 780.0 * 60.0 + 30.0) / 5.0) * 5.0);
+                    int connectMin = directMin + 105;
+
+                    foreach (var s in schedules)
+                    {
+                        var depTime = TimeOnly.ParseExact(s.Dep, "HH:mm");
+                        int durMin = s.Stops == 0 ? directMin : connectMin;
+                        int totalMin = depTime.Hour * 60 + depTime.Minute + durMin;
+                        int arrHour = (totalMin / 60) % 24;
+                        int arrMin = totalMin % 60;
+                        var arrTimeStr = $"{arrHour:D2}:{arrMin:D2}";
+                        var arrDate = totalMin >= 1440 ? depDate.AddDays(totalMin / 1440) : depDate;
+
+                        var hours = durMin / 60;
+                        var mins = durMin % 60;
+                        var durStr = hours > 0 ? (mins > 0 ? $"{hours}h {mins}m" : $"{hours}h") : $"{mins}m";
+
+                        var fare = FlightFareCalculator.CalculateEconomyFare(distance, s.Dep, s.FlightNumber, s.Airline);
+                        if (s.Stops > 0) fare = Math.Round((fare * 0.92m) / 10m) * 10m;
+
+                        toAdd.Add(new Flight
+                        {
+                            FlightNumber = $"{s.FlightNumber}-{dayOffset + 1}",
+                            Airline = s.Airline,
+                            FromCity = from,
+                            ToCity = to,
+                            StopCount = s.Stops,
+                            DepartureDate = depDate,
+                            DepartureTime = s.Dep,
+                            ArrivalDate = arrDate,
+                            ArrivalTime = arrTimeStr,
+                            Duration = durStr,
+                            DistanceKm = distance,
+                            TotalSeats = s.Seats,
+                            AvailableSeats = s.Avail,
+                            Price = fare,
+                            Status = "Scheduled",
+                            BookingDate = today,
+                            TripType = FlightTripTypes.OneWay
+                        });
+                    }
+                }
+            }
+
+            context.Flights.AddRange(toAdd);
+            context.SaveChanges();
         }
 
         private static void EnsureSeedUsers(FlightBookingDbContext context)
@@ -112,7 +197,7 @@ namespace FlightBookingBackend.Data
                 }
 
                 flight.DistanceKm = distance.Value;
-                flight.Price = FlightFareCalculator.CalculateEconomyFare(distance.Value);
+                flight.Price = FlightFareCalculator.CalculateEconomyFare(distance.Value, flight.DepartureTime, flight.FlightNumber, flight.Airline);
                 changed = true;
             }
 
@@ -131,7 +216,12 @@ namespace FlightBookingBackend.Data
             var changed = false;
             foreach (var flight in flightsWithDistance)
             {
-                var expectedFare = FlightFareCalculator.CalculateEconomyFare(flight.DistanceKm!.Value);
+                var expectedFare = FlightFareCalculator.CalculateEconomyFare(
+                    flight.DistanceKm!.Value,
+                    flight.DepartureTime,
+                    flight.FlightNumber,
+                    flight.Airline
+                );
                 if (flight.Price != expectedFare)
                 {
                     flight.Price = expectedFare;
@@ -610,6 +700,16 @@ IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', 
             context.Database.ExecuteSqlRaw(@"
 IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', N'CancelDate') IS NOT NULL
     EXEC(N'UPDATE dbo.Bookings SET CancelDate = BookingDate WHERE BookingStatus = ''Cancelled'' AND CancelDate IS NULL;');
+");
+
+            context.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', N'RescheduleDate') IS NULL
+    ALTER TABLE dbo.Bookings ADD RescheduleDate DATETIME2 NULL;
+");
+
+            context.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.Bookings', N'RescheduleDate') IS NOT NULL
+    EXEC(N'UPDATE dbo.Bookings SET RescheduleDate = BookingDate WHERE BookingStatus = ''Rescheduled'' AND RescheduleDate IS NULL;');
 ");
 
             // Make CouponTransactions.BookingId nullable so points-redemption rows (no booking) can be inserted.

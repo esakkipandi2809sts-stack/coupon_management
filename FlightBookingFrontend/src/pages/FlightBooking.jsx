@@ -7,7 +7,7 @@ import {
 
 import { bookingApi, couponApi, flightApi } from '../services/api';
 import { authUtil } from '../utils/auth';
-import { calculateClassFare, formatINR } from '../utils/flightPricing';
+import { calculateEconomyFare, calculateClassFare, formatINR } from '../utils/flightPricing';
 import { getFlightDetails } from '../utils/flightRoute';
 import './Availability.css';
 
@@ -421,7 +421,12 @@ export default function FlightBooking() {
 
   /* ---------- fare calculation ---------- */
 
-  const baseFarePerPassenger = Math.round(Number(flight?.price) || 0);
+  const rawFlightPrice = Number(flight?.price);
+  const baseFarePerPassenger = Math.round(
+    rawFlightPrice > 0
+      ? rawFlightPrice
+      : (calculateEconomyFare(flight?.distanceKm, flight?.departureTime, flight?.flightNumber, flight?.airline) || 0)
+  );
 
   const classFarePerPassenger = flight
     ? calculateClassFare(baseFarePerPassenger, selectedClass)
