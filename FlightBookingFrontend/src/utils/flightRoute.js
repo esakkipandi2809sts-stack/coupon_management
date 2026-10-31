@@ -399,15 +399,72 @@ export function toTimestamp(date, time) {
 }
 
 /**
- * Recalculates route distance, stop count, and flight type for a segment from its current cities.
- * Departure Time, Arrival Time, Duration, and Price are entered manually by the user.
+ * Calculates duration automatically between departure and arrival times (and optional dates).
+ * Returns standard format e.g. "2h 15m", "2h", "45m", or "" if invalid/incomplete.
+ */
+export function calculateDuration(departureTime, arrivalTime, departureDate, arrivalDate) {
+  if (!departureTime || !arrivalTime) return '';
+
+  const depTrimmed = String(departureTime).trim();
+  const arrTrimmed = String(arrivalTime).trim();
+
+  const timeRegex = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+  if (!timeRegex.test(depTrimmed) || !timeRegex.test(arrTrimmed)) {
+    return '';
+  }
+
+  // If both departureDate and arrivalDate are provided, calculate difference using timestamps
+  if (departureDate && arrivalDate) {
+    const depMs = toTimestamp(departureDate, depTrimmed);
+    const arrMs = toTimestamp(arrivalDate, arrTrimmed);
+    if (!Number.isNaN(depMs) && !Number.isNaN(arrMs) && arrMs > depMs) {
+      const totalMinutes = Math.round((arrMs - depMs) / 60000);
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      const parts = [];
+      if (hours > 0) parts.push(`${hours}h`);
+      if (mins > 0) parts.push(`${mins}m`);
+      return parts.join(' ') || '0m';
+    }
+  }
+
+  // Calculate difference from times directly
+  const [depH, depM] = depTrimmed.split(':').map(Number);
+  const [arrH, arrM] = arrTrimmed.split(':').map(Number);
+  if (!Number.isFinite(depH) || !Number.isFinite(depM) || !Number.isFinite(arrH) || !Number.isFinite(arrM)) {
+    return '';
+  }
+
+  let totalMinutes = (arrH * 60 + arrM) - (depH * 60 + depM);
+  if (totalMinutes < 0) {
+    totalMinutes += 24 * 60; // Overnight flight crossing midnight
+  } else if (totalMinutes === 0) {
+    return '';
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  const parts = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}m`);
+  return parts.join(' ') || '0m';
+}
+
+/**
+ * Recalculates route distance, stop count, flight type, and duration for a segment.
+ * Duration is automatically calculated from Departure Time and Arrival Time whenever available.
  */
 export function recalculateSegment(segment) {
   const next = { ...segment };
-  const { fromCity, toCity } = next;
+  const { fromCity, toCity, departureTime, arrivalTime, departureDate, arrivalDate } = next;
 
   const currentStopCount = determineStopCount(next);
   const currentFlightType = determineFlightType(currentStopCount);
+
+  const autoDuration = calculateDuration(departureTime, arrivalTime, departureDate, arrivalDate);
+  if (autoDuration) {
+    next.duration = autoDuration;
+  }
 
   if (!fromCity.trim() || !toCity.trim()) {
     return {

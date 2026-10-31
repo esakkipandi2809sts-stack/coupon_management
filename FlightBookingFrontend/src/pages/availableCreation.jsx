@@ -26,6 +26,7 @@ import {
 
 import {
   SUPPORTED_CITY_NAMES,
+  calculateDuration,
   calculateRouteDistance,
   formatDistance,
   getFlightDetails,
@@ -728,7 +729,7 @@ export default function AvailableCreation() {
 
     const previousToCity = list[index].toCity;
     const routeFields = ['fromCity', 'toCity'];
-    const timingFields = ['departureDate', 'departureTime'];
+    const timingFields = ['departureDate', 'departureTime', 'arrivalDate', 'arrivalTime'];
 
     list[index][name] = value;
 
@@ -737,6 +738,22 @@ export default function AvailableCreation() {
       timingFields.includes(name)
     ) {
       list[index] = recalculateSegment(list[index]);
+    }
+
+    if (timingFields.includes(name)) {
+      if (list[index].departureTime && list[index].arrivalTime) {
+        const autoDuration = calculateDuration(
+          list[index].departureTime,
+          list[index].arrivalTime,
+          list[index].departureDate,
+          list[index].arrivalDate
+        );
+        if (autoDuration) {
+          list[index].duration = autoDuration;
+        }
+      } else if (name === 'departureTime' || name === 'arrivalTime') {
+        list[index].duration = '';
+      }
     }
 
     clearErrorsFor(list[index], [
