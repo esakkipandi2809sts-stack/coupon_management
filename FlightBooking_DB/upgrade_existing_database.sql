@@ -238,7 +238,7 @@ BEGIN
         CONSTRAINT CK_CouponTransactions_Points CHECK (Points > 0),
         CONSTRAINT CK_CouponTransactions_DiscountAmount CHECK (DiscountAmount >= 0),
         CONSTRAINT CK_CouponTransactions_Type CHECK (TransactionType IN (N'Earned', N'Redeemed')),
-        CONSTRAINT CK_CouponTransactions_Status CHECK (Status IN (N'Available', N'Pending', N'Redeemed', N'Cancelled'))
+        CONSTRAINT CK_CouponTransactions_Status CHECK (Status IN (N'Available', N'Pending', N'Redeemed', N'Used', N'Cancelled'))
     );
 END;
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_CouponTransactions_Booking_Type' AND object_id = OBJECT_ID(N'dbo.CouponTransactions'))

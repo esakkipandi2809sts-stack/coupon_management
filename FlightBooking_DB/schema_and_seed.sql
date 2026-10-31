@@ -253,7 +253,7 @@ CREATE TABLE dbo.CouponTransactions (
     CONSTRAINT CK_CouponTransactions_Points CHECK (Points > 0),
     CONSTRAINT CK_CouponTransactions_DiscountAmount CHECK (DiscountAmount >= 0),
     CONSTRAINT CK_CouponTransactions_Type CHECK (TransactionType IN (N'Earned', N'Redeemed')),
-    CONSTRAINT CK_CouponTransactions_Status CHECK (Status IN (N'Available', N'Pending', N'Redeemed', N'Cancelled'))
+    CONSTRAINT CK_CouponTransactions_Status CHECK (Status IN (N'Available', N'Pending', N'Redeemed', N'Used', N'Cancelled'))
 );
 GO
 CREATE UNIQUE NONCLUSTERED INDEX UX_CouponTransactions_Booking_Type

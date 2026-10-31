@@ -295,8 +295,10 @@ public class BookingCouponWorkflowTests
         Assert.Equal(0m, balanceAfterRedemption.AvailablePoints);
         Assert.Equal(20m, balanceAfterRedemption.PendingPoints);
         Assert.Equal(100m, balanceAfterRedemption.RedeemedPoints);
+        Assert.Equal(100m, balanceAfterRedemption.UsedPoints);
         Assert.Equal(120m, balanceAfterRedemption.TotalPoints);
         Assert.Equal(1, await context.CouponTransactions.CountAsync(t => t.TransactionType == "Redeemed"));
+        Assert.Equal("Used", (await context.CouponTransactions.FirstAsync(t => t.TransactionType == "Redeemed")).Status);
 
         var cancelEarnedBooking = await service.CancelBookingAsync(sourceBooking.Booking!.BookingId, user.Id);
         Assert.True(cancelEarnedBooking.Success);

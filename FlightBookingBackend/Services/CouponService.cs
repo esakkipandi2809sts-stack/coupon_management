@@ -154,13 +154,23 @@ namespace FlightBookingBackend.Services
                     item.Transaction.Status = "Available";
                     hasChanges = true;
                 }
+                else if (item.CouponStatus == "Used" && item.Transaction.Status != "Used")
+                {
+                    item.Transaction.Status = "Used";
+                    hasChanges = true;
+                }
+                else if (item.CouponStatus == "Expired" && item.Transaction.Status != "Expired")
+                {
+                    item.Transaction.Status = "Expired";
+                    hasChanges = true;
+                }
             }
 
             // 2. Cancel direct redemptions for cancelled bookings
             var cancelledBookingRedeemedTx = await (
                 from t in _context.CouponTransactions
                 join b in _context.Bookings on t.BookingId equals b.BookingId
-                where t.UserId == userId && t.TransactionType == "Redeemed" && t.Status == "Redeemed" && b.BookingStatus == BookingStatuses.Cancelled
+                where t.UserId == userId && t.TransactionType == "Redeemed" && (t.Status == "Redeemed" || t.Status == "Used") && b.BookingStatus == BookingStatuses.Cancelled
                 select t
             ).ToListAsync();
 
@@ -182,7 +192,7 @@ namespace FlightBookingBackend.Services
                 .Where(t => t.TransactionType == "Earned" && t.Status == "Available")
                 .Sum(t => t.Points);
             var currentRedeemed = allUserTransactions
-                .Where(t => t.TransactionType == "Redeemed" && t.Status == "Redeemed")
+                .Where(t => t.TransactionType == "Redeemed" && (t.Status == "Redeemed" || t.Status == "Used"))
                 .Sum(t => t.Points);
 
             var pointCoupons = await _context.Coupons
@@ -193,7 +203,7 @@ namespace FlightBookingBackend.Services
             if (pointCoupons.Any())
             {
                 var pointRedeemedTx = allUserTransactions
-                    .Where(t => t.TransactionType == "Redeemed" && t.Status == "Redeemed" && t.BookingId == null)
+                    .Where(t => t.TransactionType == "Redeemed" && (t.Status == "Redeemed" || t.Status == "Used") && t.BookingId == null)
                     .OrderBy(t => t.TransactionDate)
                     .ToList();
 
@@ -212,8 +222,8 @@ namespace FlightBookingBackend.Services
                         coupon.Status = "Cancelled";
                         hasChanges = true;
 
-                        var matchingTx = pointRedeemedTx.FirstOrDefault(t => t.Status == "Redeemed" && Math.Abs(t.Points - coupon.CouponPoints) < 0.01m && t.TransactionDate <= coupon.CreatedAt.AddSeconds(10))
-                                         ?? pointRedeemedTx.FirstOrDefault(t => t.Status == "Redeemed");
+                        var matchingTx = pointRedeemedTx.FirstOrDefault(t => (t.Status == "Redeemed" || t.Status == "Used") && Math.Abs(t.Points - coupon.CouponPoints) < 0.01m && t.TransactionDate <= coupon.CreatedAt.AddSeconds(10))
+                                         ?? pointRedeemedTx.FirstOrDefault(t => t.Status == "Redeemed" || t.Status == "Used");
                         if (matchingTx != null)
                         {
                             matchingTx.Status = "Cancelled";
@@ -246,17 +256,23 @@ namespace FlightBookingBackend.Services
             var pending = transactions
                 .Where(transaction => transaction.TransactionType == "Earned" && transaction.Status == "Pending")
                 .Sum(transaction => transaction.Points);
-            var redeemed = transactions
-                .Where(transaction => transaction.TransactionType == "Redeemed" && transaction.Status == "Redeemed")
+            var earnedUsed = transactions
+                .Where(transaction => transaction.TransactionType == "Earned" && transaction.Status == "Used")
                 .Sum(transaction => transaction.Points);
-            var available = Math.Max(0m, earned - redeemed);
+            var redeemed = transactions
+                .Where(transaction => transaction.TransactionType == "Redeemed" && (transaction.Status == "Redeemed" || transaction.Status == "Used"))
+                .Sum(transaction => transaction.Points);
+            var used = Math.Max(redeemed, earnedUsed);
+            var effectiveDeduction = Math.Max(0m, redeemed - earnedUsed);
+            var available = Math.Max(0m, earned - effectiveDeduction);
 
             return new CouponBalanceDto
             {
                 AvailablePoints = available,
                 PendingPoints = pending,
-                RedeemedPoints = redeemed,
-                TotalPoints = earned + pending,
+                RedeemedPoints = used,
+                UsedPoints = used,
+                TotalPoints = earned + pending + earnedUsed,
                 AvailableDiscountAmount = Math.Floor(available / 10m)
             };
         }
@@ -486,7 +502,7 @@ namespace FlightBookingBackend.Services
                 TransactionType = "Redeemed",
                 Points = points,
                 DiscountAmount = discountAmount,
-                Status = "Redeemed",
+                Status = "Used",
                 TransactionDate = now
             });
 
@@ -581,6 +597,20 @@ namespace FlightBookingBackend.Services
                 .Where(c => c.Status != "Used" &&
                             (c.UsedCount >= c.TotalUsageLimit || c.CouponUsages.Any(u => u.Booking != null && u.Booking.BookingStatus != BookingStatuses.Cancelled)))
                 .ExecuteUpdateAsync(updates => updates.SetProperty(c => c.Status, "Used"));
+
+            // 4. Update status of earned transactions whose coupon is used
+            var usedBookingIds = await _context.Coupons
+                .Where(c => c.Status == "Used" && c.GeneratedForBookingId != null)
+                .Select(c => c.GeneratedForBookingId!.Value)
+                .Distinct()
+                .ToListAsync();
+
+            if (usedBookingIds.Any())
+            {
+                await _context.CouponTransactions
+                    .Where(t => t.TransactionType == "Earned" && t.Status != "Used" && t.Status != "Cancelled" && t.BookingId != null && usedBookingIds.Contains(t.BookingId.Value))
+                    .ExecuteUpdateAsync(updates => updates.SetProperty(t => t.Status, "Used"));
+            }
 
             // 5. Update expired
             await _context.Coupons

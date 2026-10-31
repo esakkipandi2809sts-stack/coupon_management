@@ -174,7 +174,7 @@ namespace FlightBookingBackend.Data
                     table.HasCheckConstraint(
                         "CK_CouponTransactions_Type", "[TransactionType] IN ('Earned', 'Redeemed')");
                     table.HasCheckConstraint(
-                        "CK_CouponTransactions_Status", "[Status] IN ('Available', 'Pending', 'Redeemed', 'Cancelled')");
+                        "CK_CouponTransactions_Status", "[Status] IN ('Available', 'Pending', 'Redeemed', 'Used', 'Cancelled')");
                 });
             });
 

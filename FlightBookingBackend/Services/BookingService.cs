@@ -292,7 +292,7 @@ namespace FlightBookingBackend.Services
                         TransactionType = "Redeemed",
                         Points = pointsRedeemed,
                         DiscountAmount = pointsDiscountAmount,
-                        Status = "Redeemed",
+                        Status = "Used",
                         TransactionDate = DateTime.UtcNow
                     });
                 }
@@ -630,7 +630,7 @@ namespace FlightBookingBackend.Services
                     couponTransaction.BookingId == bookingId &&
                     couponTransaction.UserId == booking.UserId &&
                     couponTransaction.TransactionType == "Redeemed" &&
-                    couponTransaction.Status == "Redeemed")
+                    (couponTransaction.Status == "Redeemed" || couponTransaction.Status == "Used"))
                 .ToListAsync();
             foreach (var t in redeemedTransactions)
             {

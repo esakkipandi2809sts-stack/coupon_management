@@ -34,6 +34,7 @@ export default function Coupons() {
   const [balance, setBalance] = useState({
     availablePoints: 0,
     pendingPoints: 0,
+    usedPoints: 0,
     redeemedPoints: 0,
     totalPoints: 0,
     availableDiscountAmount: 0,
@@ -219,9 +220,9 @@ export default function Coupons() {
             </div>
             <div style={{ width: '1px', backgroundColor: 'rgba(255,255,255,0.2)' }} />
             <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '0.72rem', color: '#bae6fd', fontWeight: 600, textTransform: 'uppercase', margin: '0 0 4px' }}>Redeemed</p>
+              <p style={{ fontSize: '0.72rem', color: '#bae6fd', fontWeight: 600, textTransform: 'uppercase', margin: '0 0 4px' }}>Used</p>
               <p style={{ fontSize: '1.4rem', fontWeight: 800, color: '#4ade80', margin: 0 }}>
-                {loading ? '—' : Math.round(balance.redeemedPoints).toLocaleString()}
+                {loading ? '—' : Math.round(balance.usedPoints ?? balance.redeemedPoints ?? 0).toLocaleString()}
               </p>
             </div>
           </div>

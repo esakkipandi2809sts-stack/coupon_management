@@ -91,6 +91,7 @@ namespace FlightBookingBackend.DTOs
         public decimal AvailablePoints { get; set; }
         public decimal PendingPoints { get; set; }
         public decimal RedeemedPoints { get; set; }
+        public decimal UsedPoints { get; set; }
         public decimal TotalPoints { get; set; }
         public decimal AvailableDiscountAmount { get; set; }
     }
