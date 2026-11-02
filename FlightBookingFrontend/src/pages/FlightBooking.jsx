@@ -1129,7 +1129,7 @@ export default function FlightBooking() {
             <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px dashed #cbd5e1' }}>
               <div style={{ marginBottom: 14 }}>
                 <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#1e293b' }}>
-                  Contact Details (Passenger 1 / Primary Contact)
+                  Contact Details
                 </h3>
 
               </div>
@@ -1173,14 +1173,12 @@ export default function FlightBooking() {
 
             {/* Seat Selection (Optional) */}
             <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px dashed #cbd5e1' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+              <div style={{  marginBottom: 14,}}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#1e293b' }}>
+                  <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#1e293b', marginBottom: 15 }}>
                     Seat Selection (Optional)
                   </h3>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                    Select a seat on the interactive plane map for each traveller
-                  </span>
+                 
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {passengers.map((p, idx) => (
