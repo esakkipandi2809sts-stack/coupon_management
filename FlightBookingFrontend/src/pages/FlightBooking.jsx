@@ -1177,8 +1177,7 @@ export default function FlightBooking() {
                 <div>
                   <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#1e293b', marginBottom: 15 }}>
                     Seat Selection (Optional)
-                  </h3>
-                 
+                  </h3>                 
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {passengers.map((p, idx) => (
