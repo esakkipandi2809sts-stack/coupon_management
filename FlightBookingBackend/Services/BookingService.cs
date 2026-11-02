@@ -57,6 +57,18 @@ namespace FlightBookingBackend.Services
                 return (false, "Flight not found.", null);
             }
 
+            // 2b. Validate Passenger Titles: only "Mr" and "Mrs" are allowed
+            if (dto.Passengers != null && dto.Passengers.Count > 0)
+            {
+                foreach (var p in dto.Passengers)
+                {
+                    if (!string.IsNullOrWhiteSpace(p.Title) && p.Title != "Mr" && p.Title != "Mrs")
+                    {
+                        return (false, "Title must be either 'Mr' or 'Mrs'.", null);
+                    }
+                }
+            }
+
             // 3. Check seat availability
             if (flight.AvailableSeats < dto.PassengerCount)
             {
@@ -171,6 +183,7 @@ namespace FlightBookingBackend.Services
                     {
                         new PassengerDto
                         {
+                            Title = "Mr",
                             Name = dto.PassengerName.Trim(),
                             Email = dto.PassengerEmail.Trim(),
                             Phone = dto.PassengerPhone.Trim(),
@@ -179,6 +192,14 @@ namespace FlightBookingBackend.Services
                             Seat = dto.SeatNumber.Trim().ToUpper()
                         }
                     };
+
+                foreach (var p in passengersList)
+                {
+                    if (string.IsNullOrWhiteSpace(p.Title) || (p.Title != "Mr" && p.Title != "Mrs"))
+                    {
+                        p.Title = "Mr";
+                    }
+                }
 
                 var serializedPassengers = JsonSerializer.Serialize(passengersList);
 
@@ -235,6 +256,8 @@ namespace FlightBookingBackend.Services
                     PassengerDetails = serializedPassengers,
                     BookingDate = DateTime.UtcNow,
                     FlightJourneyDate = flight.DepartureDate,
+                    FromCity = flight.FromCity,
+                    ToCity = flight.ToCity,
                     DistanceKm = distanceKm,
                     BaseFare = baseFare,
                     Taxes = taxes,
@@ -462,6 +485,8 @@ namespace FlightBookingBackend.Services
                     PassengerCount = dto.PassengerCount,
                     BookingDate = DateTime.UtcNow,
                     FlightJourneyDate = flight.DepartureDate,
+                    FromCity = flight.FromCity,
+                    ToCity = flight.ToCity,
                     DistanceKm = distanceKm,
                     BaseFare = baseFare,
                     Taxes = 0m,
@@ -764,6 +789,8 @@ namespace FlightBookingBackend.Services
             booking.Flight = newFlight;
             booking.FlightId = newFlight.FlightId;
             booking.FlightJourneyDate = newFlight.DepartureDate;
+            booking.FromCity = newFlight.FromCity;
+            booking.ToCity = newFlight.ToCity;
             booking.DistanceKm = newFlight.DistanceKm;
             booking.BaseFare = newTotalBaseFare;
             booking.TicketPrice = newTicketPrice;
@@ -910,8 +937,8 @@ namespace FlightBookingBackend.Services
                 RescheduleDate = b.RescheduleDate,
                 FlightNumber = b.Flight?.FlightNumber ?? "N/A",
                 Airline = b.Flight?.Airline ?? "N/A",
-                FromCity = b.Flight?.FromCity ?? "N/A",
-                ToCity = b.Flight?.ToCity ?? "N/A",
+                FromCity = !string.IsNullOrWhiteSpace(b.FromCity) ? b.FromCity : (b.Flight?.FromCity ?? "N/A"),
+                ToCity = !string.IsNullOrWhiteSpace(b.ToCity) ? b.ToCity : (b.Flight?.ToCity ?? "N/A"),
                 DepartureDate = b.Flight?.DepartureDate ?? DateOnly.MinValue,
                 DepartureTime = b.Flight?.DepartureTime ?? "N/A",
                 ArrivalDate = b.Flight?.ArrivalDate ?? DateOnly.MinValue,

@@ -156,10 +156,8 @@ if (!string.IsNullOrWhiteSpace(configuredConnection))
     var sqlBuilder =
         new SqlConnectionStringBuilder(configuredConnection);
 
-    app.Logger.LogInformation(
-        "Configured SQL Server: {Server}; Database: {Database}",
-        sqlBuilder.DataSource,
-        sqlBuilder.InitialCatalog);
+    app.Logger.LogInformation("Configured SQL Server: {Server}", sqlBuilder.DataSource);
+    app.Logger.LogInformation("Database: {Database}", sqlBuilder.InitialCatalog);
 }
 
 // 9. Initialize and verify the database connection
@@ -175,6 +173,8 @@ using (var scope = app.Services.CreateScope())
 
         // Open the actual configured database connection
         await context.Database.OpenConnectionAsync();
+
+        logger.LogInformation("Database connection successful.");
 
         var connection = context.Database.GetDbConnection();
 

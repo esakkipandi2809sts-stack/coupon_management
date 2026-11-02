@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Plane, Clock, User, Tag, CheckCircle, AlertCircle, CreditCard,
@@ -24,8 +24,8 @@ const EMPTY_PASSENGER = {
   seat: ''
 };
 
-const PAYMENT_METHODS = ['Credit Card', 'Debit Card', 'UPI / NetBanking'];
-const TITLES = ['Mr', 'Mrs', 'Ms', 'Miss', 'Dr'];
+
+const TITLES = ['Mr', 'Mrs'];
 
 const styles = {
   card: {
@@ -238,6 +238,28 @@ export default function FlightBooking() {
       : []
   );
 
+  const totalFlightSeats = flight?.totalSeats || 120;
+  const availFlightSeats = flight?.availableSeats >= 0 ? flight.availableSeats : totalFlightSeats;
+  const targetBookedSeatsCount = Math.max(0, totalFlightSeats - availFlightSeats);
+
+  const effectiveBookedSeats = useMemo(() => {
+    const bookedSet = new Set((bookedSeats || []).map(s => String(s).trim().toUpperCase()));
+    if (bookedSet.size < targetBookedSeatsCount) {
+      const cols = [...LEFT, ...RIGHT];
+      for (let r = 11; r <= 30; r++) {
+        for (const c of cols) {
+          const seat = `${r}${c}`;
+          if (!bookedSet.has(seat)) {
+            bookedSet.add(seat);
+            if (bookedSet.size >= targetBookedSeatsCount) break;
+          }
+        }
+        if (bookedSet.size >= targetBookedSeatsCount) break;
+      }
+    }
+    return Array.from(bookedSet);
+  }, [bookedSeats, targetBookedSeatsCount]);
+
   const [formErrors, setFormErrors] = useState({});
   const [bookingError, setBookingError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -366,7 +388,9 @@ export default function FlightBooking() {
     passengers.forEach((passenger, index) => {
       const err = {};
 
-      if (!passenger.title) err.title = 'Select a title.';
+      if (!passenger.title || !['Mr', 'Mrs'].includes(passenger.title)) {
+        err.title = 'Title must be either Mr or Mrs.';
+      }
       if (!passenger.firstName?.trim()) err.firstName = 'First name is required.';
       if (!passenger.lastName?.trim()) err.lastName = 'Last name is required.';
 
@@ -648,7 +672,7 @@ export default function FlightBooking() {
             passenger.name || `${passenger.firstName} ${passenger.lastName}`
           ).trim();
           return {
-            title: passenger.title || 'Mr',
+            title: ['Mr', 'Mrs'].includes(passenger.title) ? passenger.title : 'Mr',
             firstName: (passenger.firstName || '').trim(),
             lastName: (passenger.lastName || '').trim(),
             name: fullName,
@@ -848,7 +872,7 @@ export default function FlightBooking() {
 
                 // Seats taken on the flight + seats already chosen by other passengers
                 const unavailableSeats = [
-                  ...bookedSeats,
+                  ...effectiveBookedSeats,
                   ...passengers
                     .filter((_, otherIndex) => otherIndex !== index)
                     .map(other => (other.seat || '').trim().toUpperCase())
@@ -990,41 +1014,7 @@ export default function FlightBooking() {
               </p>
             </div>
 
-            {/* Payment */}
-            <div style={{ marginTop: 24 }}>
-              <h3 style={{ fontSize: '1rem', marginBottom: 12 }}>Payment Method</h3>
-
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                gap: 10
-              }}>
-                {PAYMENT_METHODS.map(method => (
-                  <button
-                    type="button"
-                    key={method}
-                    onClick={() => setPaymentMethod(method)}
-                    aria-pressed={paymentMethod === method}
-                    style={{
-                      padding: 12,
-                      borderRadius: 10,
-                      border: paymentMethod === method ? '2px solid #0284c7' : '1px solid #e2e8f0',
-                      background: paymentMethod === method ? '#f0f9ff' : '#fff',
-                      color: paymentMethod === method ? '#0369a1' : '#475569',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <CreditCard size={19} />
-                    <div style={{ marginTop: 6, fontSize: '0.8rem' }}>{method}</div>
-                  </button>
-                ))}
-              </div>
-
-              <small style={{ color: '#64748b' }}>
-                This is a simulated payment selection, not a real payment gateway.
-              </small>
-            </div>
+   
           </section>
         </div>
 

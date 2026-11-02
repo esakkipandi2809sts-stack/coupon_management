@@ -180,7 +180,7 @@ namespace FlightBookingBackend.Services
 
         public async Task<List<string>> GetBookedSeatsAsync(int flightId)
         {
-            return await _context.Bookings
+            var bookedSeats = await _context.Bookings
                 .AsNoTracking()
                 .Where(b => b.FlightId == flightId &&
                             b.BookingStatus != BookingStatuses.Cancelled &&
@@ -189,6 +189,39 @@ namespace FlightBookingBackend.Services
                 .Select(b => b.SeatNumber.Trim().ToUpper())
                 .Distinct()
                 .ToListAsync();
+
+            var flight = await _context.Flights
+                .AsNoTracking()
+                .FirstOrDefaultAsync(f => f.FlightId == flightId);
+
+            if (flight != null)
+            {
+                var totalSeats = flight.TotalSeats > 0 ? flight.TotalSeats : 120;
+                var availableSeats = flight.AvailableSeats >= 0 ? flight.AvailableSeats : totalSeats;
+                var targetBookedCount = Math.Max(0, totalSeats - availableSeats);
+
+                if (bookedSeats.Count < targetBookedCount)
+                {
+                    var bookedSet = new HashSet<string>(bookedSeats, StringComparer.OrdinalIgnoreCase);
+                    var columns = new[] { "A", "B", "C", "D", "E", "F" };
+                    int row = 11;
+                    while (bookedSet.Count < targetBookedCount)
+                    {
+                        foreach (var col in columns)
+                        {
+                            var seat = $"{row}{col}";
+                            if (bookedSet.Add(seat))
+                            {
+                                if (bookedSet.Count >= targetBookedCount) break;
+                            }
+                        }
+                        row++;
+                    }
+                    return bookedSet.OrderBy(s => s).ToList();
+                }
+            }
+
+            return bookedSeats;
         }
 
         public async Task<bool> DeleteFlightAsync(int flightId)

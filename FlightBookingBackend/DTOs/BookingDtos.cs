@@ -46,6 +46,7 @@ namespace FlightBookingBackend.DTOs
 
     public class PassengerDto
     {
+        [RegularExpression("^(Mr|Mrs)$", ErrorMessage = "Title must be either 'Mr' or 'Mrs'.")]
         public string? Title { get; set; }
         public string? FirstName { get; set; }
         public string? LastName { get; set; }

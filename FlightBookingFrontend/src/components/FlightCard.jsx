@@ -158,7 +158,7 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
       <section className="flight-ticket-point flight-ticket-departure" aria-label="Departure">
         <strong className="flight-ticket-time">{formatTime(flight.departureTime)}</strong>
         <strong className="flight-ticket-airport">{departureAirport}</strong>
-        <span className="flight-ticket-city">{flight.fromCity}</span>
+        {/* <span className="flight-ticket-city">{flight.fromCity}</span> */}
         <span className="flight-ticket-date">
           <CalendarDays size={13} />
           {formatDay(flight.departureDate)}, {formatDate(flight.departureDate)}
@@ -192,7 +192,7 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
           {arrivalAirport}
           {dateDifference && <sup className="flight-ticket-day-offset">{dateDifference}</sup>}
         </strong>
-        <span className="flight-ticket-city">{flight.toCity}</span>
+        {/* <span className="flight-ticket-city">{flight.toCity}</span> */}
         <span className="flight-ticket-date">
           <CalendarDays size={13} />
           {formatDay(flight.arrivalDate)}, {formatDate(flight.arrivalDate)}
@@ -228,32 +228,7 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
           <ShieldCheck size={14} />
           Regular Fare
         </span>
-        {flight.bookingDate && (
-          <span className="flight-ticket-meta" title="Booking Date">
-            <CalendarDays size={14} />
-            Booking: {formatDate(flight.bookingDate)}
-          </span>
-        )}
-        <button
-          type="button"
-          className="flight-ticket-link"
-          aria-expanded={openPanel === 'details'}
-          onClick={() => togglePanel('details')}
-        >
-          <PlaneTakeoff size={14} />
-          Flight Details
-          {openPanel === 'details' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-        <button
-          type="button"
-          className="flight-ticket-link"
-          aria-expanded={openPanel === 'rules'}
-          onClick={() => togglePanel('rules')}
-        >
-          <Armchair size={14} />
-          Fare Rule
-          {openPanel === 'rules' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
+
       </footer>
 
       {openPanel === 'details' && (

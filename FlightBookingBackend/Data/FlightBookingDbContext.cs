@@ -114,6 +114,9 @@ namespace FlightBookingBackend.Data
                     .HasFilter("[IdempotencyKey] IS NOT NULL")
                     .HasDatabaseName("UX_Bookings_User_IdempotencyKey");
 
+                entity.Property(e => e.FromCity).HasMaxLength(100);
+                entity.Property(e => e.ToCity).HasMaxLength(100);
+
                 entity.HasOne(d => d.User)
                     .WithMany(p => p.Bookings)
                     .HasForeignKey(d => d.UserId)

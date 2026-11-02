@@ -52,13 +52,13 @@
 
 .availability-main-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1.15fr) 38px minmax(160px, 1.15fr) minmax(140px, 1fr) minmax(140px, 1fr);
+  grid-template-columns: minmax(160px, 1.2fr) 38px minmax(160px, 1.2fr) minmax(160px, 1fr);
   align-items: end;
   gap: 12px;
 }
 
 .availability-main-row.has-return {
-  grid-template-columns: minmax(140px, 1.1fr) 38px minmax(140px, 1.1fr) minmax(125px, 1fr) minmax(125px, 1fr) minmax(125px, 1fr);
+  grid-template-columns: minmax(140px, 1.15fr) 38px minmax(140px, 1.15fr) minmax(130px, 1fr) minmax(130px, 1fr);
 }
 
 .availability-field {
@@ -336,7 +336,7 @@
 
 .availability-segment-row {
   display: grid;
-  grid-template-columns: 65px minmax(140px, 1.1fr) 38px minmax(140px, 1.1fr) minmax(130px, 1fr) minmax(130px, 1fr) 32px;
+  grid-template-columns: 65px minmax(140px, 1.15fr) 38px minmax(140px, 1.15fr) minmax(150px, 1fr) 32px;
   align-items: end;
   gap: 11px;
   padding: 12px;
@@ -777,11 +777,11 @@
 @media (max-width: 1150px) {
 
   .availability-main-row {
-    grid-template-columns: minmax(140px, 1.15fr) 38px minmax(140px, 1.15fr) minmax(130px, 1fr) minmax(130px, 1fr);
+    grid-template-columns: minmax(140px, 1.2fr) 38px minmax(140px, 1.2fr) minmax(140px, 1fr);
   }
 
   .availability-main-row.has-return {
-    grid-template-columns: minmax(120px, 1fr) 32px minmax(120px, 1fr) minmax(115px, 1fr) minmax(115px, 1fr) minmax(115px, 1fr);
+    grid-template-columns: minmax(120px, 1fr) 32px minmax(120px, 1fr) minmax(115px, 1fr) minmax(115px, 1fr);
   }
 
   .availability-additional {
@@ -892,13 +892,12 @@
     grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr);
   }
 
-  .availability-main-row>.availability-field:nth-of-type(3),
-  .availability-main-row>.availability-field:nth-of-type(4) {
+  .availability-main-row>.availability-field:nth-of-type(3) {
     grid-column: 1 / -1;
   }
 
-  .availability-main-row.has-return>.availability-field:nth-of-type(4),
-  .availability-main-row.has-return>.availability-field:nth-of-type(5) {
+  .availability-main-row.has-return>.availability-field:nth-of-type(3),
+  .availability-main-row.has-return>.availability-field:nth-of-type(4) {
     grid-column: span 1;
   }
 

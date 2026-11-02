@@ -381,14 +381,6 @@ export default function Availability() {
       return 'Origin and destination must be different.';
     }
 
-    if (segments.some((segment) => !segment.bookingDate)) {
-      return 'Select a booking date for each flight segment.';
-    }
-
-    if (segments.some((segment) => segment.bookingDate < today)) {
-      return 'Booking dates cannot be in the past.';
-    }
-
     if (segments.some((segment) => !segment.departureDate)) {
       return 'Select a departure date for each segment.';
     }
@@ -621,15 +613,6 @@ export default function Availability() {
                   />
 
                   <DateField
-                    label="Booking Date"
-                    value={segment.bookingDate}
-                    min={today}
-                    onChange={(value) =>
-                      updateSegment(segment.id, 'bookingDate', value)
-                    }
-                  />
-
-                  <DateField
                     label="Departure Date"
                     value={segment.departureDate}
                     min={today}
@@ -696,15 +679,6 @@ export default function Availability() {
                 loading={optionsLoading}
                 icon={PlaneLanding}
                 listId="locations-primary-destination"
-              />
-
-              <DateField
-                label="Booking Date"
-                value={primarySegment.bookingDate}
-                min={today}
-                onChange={(value) =>
-                  updateSegment(primarySegment.id, 'bookingDate', value)
-                }
               />
 
               <DateField

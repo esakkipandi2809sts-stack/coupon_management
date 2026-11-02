@@ -73,7 +73,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_Coupons_Status_Availa
 UPDATE dbo.Flights
 SET Price = CASE
     WHEN DistanceKm * 4 < 1500 THEN 1500
-    ELSE ROUND(DistanceKm * 4, 0)
+    ELSE ROUND(DistanceKm * 4, 2)
 END
 WHERE DistanceKm IS NOT NULL;
 

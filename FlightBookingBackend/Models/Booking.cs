@@ -60,6 +60,12 @@ namespace FlightBookingBackend.Models
         [Column(TypeName = "date")]
         public DateOnly? FlightJourneyDate { get; set; }
 
+        [MaxLength(100)]
+        public string? FromCity { get; set; }
+
+        [MaxLength(100)]
+        public string? ToCity { get; set; }
+
         [Column(TypeName = "decimal(10,2)")]
         public decimal? DistanceKm { get; set; }
 

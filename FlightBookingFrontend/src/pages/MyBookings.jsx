@@ -68,14 +68,18 @@ const BASE_FLIGHT_SEATS = [
   '19C', '19D', '20C', '20D'
 ];
 
-const getFlightSeats = () => {
-  const letters = ['A', 'B'];
+const getFlightSeats = (totalSeatsCount = 120) => {
+  const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
   const seats = [];
+  const limit = Math.max(1, totalSeatsCount || 120);
 
-  for (let row = 11; row <= 20; row++) {
+  for (let row = 11; row <= 30; row++) {
     for (const letter of letters) {
-      seats.push(`${row}${letter}`);
+      if (seats.length < limit) {
+        seats.push(`${row}${letter}`);
+      }
     }
+    if (seats.length >= limit) break;
   }
 
   return seats;
@@ -459,19 +463,41 @@ export default function MyBookings() {
     const flightObj = flightOptions.find(
       (f) => String(f.flightId) === String(selectedFlightId)
     );
-    return getFlightSeats(flightObj?.totalSeats || 20);
+    return getFlightSeats(flightObj?.totalSeats || 120);
   }, [selectedFlightId, flightOptions]);
+
+  const effectiveBookedSeatsForFlight = useMemo(() => {
+    const flightObj = flightOptions.find(
+      (f) => String(f.flightId) === String(selectedFlightId)
+    );
+    const total = flightObj?.totalSeats || 120;
+    const avail = flightObj?.availableSeats >= 0 ? flightObj.availableSeats : total;
+    const targetBooked = Math.max(0, total - avail);
+
+    const allSeats = getFlightSeats(total);
+    const bookedSet = new Set((bookedSeatsForFlight || []).map((s) => s.toUpperCase()));
+
+    if (bookedSet.size < targetBooked) {
+      for (const seat of allSeats) {
+        if (!bookedSet.has(seat.toUpperCase())) {
+          bookedSet.add(seat.toUpperCase());
+          if (bookedSet.size >= targetBooked) break;
+        }
+      }
+    }
+    return Array.from(bookedSet);
+  }, [selectedFlightId, flightOptions, bookedSeatsForFlight]);
 
   const availableSeatsOnly = useMemo(() => {
     if (!selectedFlightId) return [];
     const flightObj = flightOptions.find(
       (f) => String(f.flightId) === String(selectedFlightId)
     );
-    const allSeats = getFlightSeats(flightObj?.totalSeats || 20);
-    const bookedSet = new Set(bookedSeatsForFlight.map((s) => s.toUpperCase()));
+    const allSeats = getFlightSeats(flightObj?.totalSeats || 120);
+    const bookedSet = new Set(effectiveBookedSeatsForFlight.map((s) => s.toUpperCase()));
     // Display ONLY the seats that are available and have not yet been booked
     return allSeats.filter((seat) => !bookedSet.has(seat.toUpperCase()));
-  }, [selectedFlightId, flightOptions, bookedSeatsForFlight]);
+  }, [selectedFlightId, flightOptions, effectiveBookedSeatsForFlight]);
 
   // Confirm reschedule and show success alert
   const submitReschedule = async () => {
@@ -490,7 +516,7 @@ export default function MyBookings() {
       return;
     }
 
-    if (bookedSeatsForFlight.includes(rescheduleSeat.trim().toUpperCase())) {
+    if (effectiveBookedSeatsForFlight.includes(rescheduleSeat.trim().toUpperCase())) {
       setRescheduleError(
         `Seat ${rescheduleSeat.trim().toUpperCase()} is already booked. Please choose an available seat.`
       );
@@ -1645,7 +1671,7 @@ export default function MyBookings() {
                   padding: '11px 12px',
                   borderRadius: '10px',
                   border:
-                    rescheduleSeat && bookedSeatsForFlight.includes(rescheduleSeat.toUpperCase())
+                    rescheduleSeat && effectiveBookedSeatsForFlight.includes(rescheduleSeat.toUpperCase())
                       ? '1.5px solid #dc2626'
                       : '1px solid #cbd5e1',
                   fontSize: '0.9rem',
@@ -1654,7 +1680,7 @@ export default function MyBookings() {
                 }}
               />
 
-              {rescheduleSeat && bookedSeatsForFlight.includes(rescheduleSeat.toUpperCase()) ? (
+              {rescheduleSeat && effectiveBookedSeatsForFlight.includes(rescheduleSeat.toUpperCase()) ? (
                 <p
                   style={{
                     fontSize: '0.78rem',
@@ -1802,83 +1828,10 @@ export default function MyBookings() {
                     overflowX: 'auto',
                   }}
                 >
-                  {/* Row 1: 11A - 16C (11 seats) */}
+                  {/* Seat Grid */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                    {allFlightSeats.slice(0, 11).map((seat) => {
-                      const isBooked = bookedSeatsForFlight.includes(seat.toUpperCase());
-                      const isSelected = rescheduleSeat.trim().toUpperCase() === seat.toUpperCase();
-
-                      return (
-                        <button
-                          key={seat}
-                          type="button"
-                          disabled={isBooked}
-                          title={
-                            isBooked
-                              ? `Seat ${seat} is already booked`
-                              : isSelected
-                              ? `Seat ${seat} is selected`
-                              : `Seat ${seat} is available`
-                          }
-                          onClick={() => {
-                            if (!isBooked) {
-                              setRescheduleSeat(seat);
-                              setRescheduleError('');
-                            }
-                          }}
-                          style={{
-                            minWidth: '48px',
-                            height: '40px',
-                            borderRadius: '10px',
-                            fontSize: '0.9rem',
-                            fontWeight: 700,
-                            fontFamily: 'var(--font-mono)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '0 8px',
-                            transition: 'all 0.15s ease',
-                            cursor: isBooked ? 'not-allowed' : 'pointer',
-                            backgroundColor: isBooked
-                              ? '#fee2e2'
-                              : isSelected
-                              ? '#0284c7'
-                              : '#ffffff',
-                            border: isBooked
-                              ? '1.5px solid #f87171'
-                              : isSelected
-                              ? '1.5px solid #0284c7'
-                              : '1.5px solid #cbd5e1',
-                            color: isBooked
-                              ? '#dc2626'
-                              : isSelected
-                              ? '#ffffff'
-                              : '#1e293b',
-                            textDecoration: isBooked ? 'line-through' : 'none',
-                            boxShadow: isSelected ? '0 2px 8px rgba(2, 132, 199, 0.35)' : 'none',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isBooked && !isSelected) {
-                              e.currentTarget.style.borderColor = '#0284c7';
-                              e.currentTarget.style.backgroundColor = '#f0f9ff';
-                              e.currentTarget.style.color = '#0284c7';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isBooked && !isSelected) {
-                              e.currentTarget.style.borderColor = '#cbd5e1';
-                              e.currentTarget.style.backgroundColor = '#ffffff';
-                              e.currentTarget.style.color = '#1e293b';
-                            }
-                          }}
-                        >
-                          {seat}
-                        </button>
-                      );
-                    })}
-
-                    {allFlightSeats.slice(11).map((seat) => {
-                      const isBooked = bookedSeatsForFlight.includes(seat.toUpperCase());
+                    {allFlightSeats.map((seat) => {
+                      const isBooked = effectiveBookedSeatsForFlight.includes(seat.toUpperCase());
                       const isSelected = rescheduleSeat.trim().toUpperCase() === seat.toUpperCase();
 
                       return (

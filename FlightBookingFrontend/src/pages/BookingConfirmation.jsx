@@ -7,7 +7,9 @@ import {
   Printer,
   LayoutDashboard,
   Plane,
-  QrCode
+  QrCode,
+  Star,
+  Clock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatINR } from '../utils/flightPricing';
@@ -258,7 +260,7 @@ export default function BookingConfirmation() {
 
             {/* Flight Path with Plane */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '140px' }}>
-              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginBottom: '6px' }}>
+              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginBottom: '15px' }}>
                 {booking.duration}
               </span>
               <div style={{ width: '100%', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -267,7 +269,7 @@ export default function BookingConfirmation() {
                   <Plane size={14} style={{ transform: 'rotate(45deg)' }} />
                 </div>
               </div>
-              <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 700, marginTop: '6px' }}>
+              <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 700, marginTop: '15px' }}>
                 Flight {booking.flightNumber}
               </span>
             </div>
@@ -303,16 +305,15 @@ export default function BookingConfirmation() {
             <div>
               <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 600 }}>Passenger</div>
               <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', marginTop: '3px' }}>{booking.passengerName}</div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                Age: {booking.passengerAge} • {booking.passengerGender}
-                {(booking.passengerDob || booking.dateOfBirth) ? ` • DOB: ${booking.passengerDob || booking.dateOfBirth}` : ''}
+              <div style={{ fontSize: '0.75rem', color: '#64748b', }}>
+                Age : {booking.passengerAge} • {booking.passengerGender}
+                
               </div>
-              {booking.passengerPhone && (
-                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>{booking.passengerPhone}</div>
-              )}
-              {booking.passengerEmail && (
-                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '1px' }}>{booking.passengerEmail}</div>
-              )}
+              <div style={{ fontSize: '0.75rem', color: '#64748b', }}>
+                
+                {(booking.passengerDob || booking.dateOfBirth) ? ` DOB : ${booking.passengerDob || booking.dateOfBirth}` : ''}
+              </div>
+             
             </div>
 
             <div>
@@ -382,89 +383,252 @@ export default function BookingConfirmation() {
             </div>
           )}
 
-          {/* Financial Breakdown & Barcode stub */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '24px', flexWrap: 'wrap', gap: '20px' }}>
-            <div style={{ display: 'flex', gap: '32px' }}>
-              <div>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase' }}>Base Fare</span>
-                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>
-                  {formatINR(booking.baseFare ?? booking.finalAmount ?? booking.ticketPrice)}
-                </div>
-              </div>
-
-              {Number(booking.discountAmount || 0) > 0 && (
+          {/* Financial Breakdown, Reward Coupon, QR Code, and Slogan matching Image 2 */}
+          <div style={{ paddingTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Top Row: Fare Pill Card + Reward Coupon Card */}
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'stretch' }}>
+              {/* Fare Pill Card */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  backgroundColor: '#f0f7ff',
+                  border: '1.5px solid #dbeafe',
+                  borderRadius: '16px',
+                  padding: '15px',
+                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.04)',
+                  flexShrink: 0
+                }}
+              >
                 <div>
-                  <span style={{ fontSize: '0.72rem', color: '#059669', textTransform: 'uppercase' }}>
-                    Coupon Discount ({booking.appliedCouponCode || 'Coupon'})
-                  </span>
-                  <div style={{ fontWeight: 700, color: '#059669', fontSize: '0.9rem' }}>
-                    -{formatINR(booking.discountAmount)}
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>
+                    BASE FARE
                   </div>
-                  {(booking.appliedCouponPercentage || booking.appliedCouponPoints) && (
-                    <div style={{ fontSize: '0.75rem', color: '#059669' }}>
-                      {booking.appliedCouponPercentage ? `${booking.appliedCouponPercentage}% ` : ''}
-                      {booking.appliedCouponPoints ? `(${Math.round(booking.appliedCouponPoints)} pts)` : ''}
-                    </div>
-                  )}
+                  <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                    {formatINR(booking.baseFare ?? booking.finalAmount ?? booking.ticketPrice)}
+                  </div>
                 </div>
-              )} 
 
-              {booking.pointsDiscountAmount > 0 && !booking.discountAmount && (
+                <div style={{ width: '1px', height: '38px', backgroundColor: '#cbd5e1', margin: '0 20px' }} />
+
                 <div>
-                  <span style={{ fontSize: '0.72rem', color: '#059669', textTransform: 'uppercase' }}>
-                    Points Redeemed ({Math.round(Number(booking.pointsRedeemed || 0))} pts)
-                  </span>
-                  <div style={{ fontWeight: 700, color: '#059669', fontSize: '0.9rem' }}>-{formatINR(booking.pointsDiscountAmount)}</div>
+                  <div style={{ fontSize: '0.72rem', color: '#0284c7', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>
+                    FINAL FARE
+                  </div>
+                  <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0284c7', marginTop: '2px' }}>
+                    {formatINR(booking.finalAmount ?? booking.finalFare ?? booking.ticketPrice)}
+                  </div>
                 </div>
-              )}
 
-              <div>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase' }}>Taxes & Fees</span>
-                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>{formatINR(booking.taxes ?? 0)}</div>
+                {Number(booking.discountAmount || 0) > 0 && (
+                  <>
+                    <div style={{ width: '1px', height: '38px', backgroundColor: '#cbd5e1', margin: '0 16px' }} />
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: '#059669', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.04em' }}>
+                        DISCOUNT
+                      </div>
+                      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#059669', marginTop: '2px' }}>
+                        -{formatINR(booking.discountAmount)}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div>
-                <span style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 700, textTransform: 'uppercase' }}>Final Fare</span>
-                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0284c7' }}>
-                  {formatINR(booking.finalAmount ?? booking.finalFare ?? booking.ticketPrice)}
-                </div>
-                {booking.generatedCouponCode && (
-                  <div style={{ marginTop: '18px', padding: '14px 16px', borderRadius: '12px', backgroundColor: '#fffbeb', border: '1px solid #fde68a' }}>
-                    <div style={{ fontWeight: 700, color: '#92400e' }}>
+              {/* Reward Coupon Card */}
+              {booking.generatedCouponCode ? (
+                <div
+                  style={{
+                    flex: '1 1 320px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    backgroundColor: '#fffbeb',
+                    border: '1.5px solid #fde68a',
+                    borderRadius: '16px',
+                    padding: '10px 15px',
+                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.06)'
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      flexShrink: 0,
+                      boxShadow: '0 2px 6px rgba(217, 119, 6, 0.35)'
+                    }}
+                  >
+                    <Star size={18} fill="#ffffff" stroke="#ffffff" />
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, color: '#78350f', fontSize: '0.92rem', letterSpacing: '-0.01em' }}>
                       Earned {booking.generatedCouponPercentage ? `${booking.generatedCouponPercentage}% ` : ''}Reward Coupon: {booking.generatedCouponCode}
                     </div>
-                    <div style={{ fontSize: '0.82rem', color: '#78350f', marginTop: '4px' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#92400e', marginTop: '2px', fontWeight: 500 }}>
                       Coupon Points: <strong>{Math.round(booking.generatedCouponPoints || booking.couponPointsEarned || 0)} pts</strong>
                       {booking.generatedCouponPercentage ? ` (${booking.generatedCouponPercentage}%)` : ''} · Discount: <strong>{formatINR(booking.generatedCouponAmount || 0)}</strong> · Final Fare: <strong>{formatINR(booking.finalAmount ?? booking.ticketPrice)}</strong>
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: '#92400e', marginTop: '4px' }}>
-                      Status: {booking.generatedCouponStatus}. Available on your flight departure date ({booking.generatedCouponAvailableFromDate || 'shown in your bookings'}).
+                    <div style={{ fontSize: '0.74rem', color: '#78350f', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Clock size={13} color="#4338ca" style={{ flexShrink: 0 }} />
+                      <span>
+                        <strong>Status:</strong> {booking.generatedCouponStatus || 'Pending'}. Available on your flight departure date ({booking.generatedCouponAvailableFromDate || booking.departureDate || 'shown in your bookings'}).
+                      </span>
                     </div>
                   </div>
-                )}
-                {booking.couponPointsEarned > 0 && !booking.generatedCouponCode && (
-                  <div style={{ marginTop: '10px', color: '#0369a1', fontSize: '0.82rem', fontWeight: 700 }}>
-                    Earned {Math.round(booking.couponPointsEarned)} coupon points from this booking.
+                </div>
+              ) : booking.couponPointsEarned > 0 ? (
+                <div
+                  style={{
+                    flex: '1 1 320px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    backgroundColor: '#f0f9ff',
+                    border: '1.5px solid #bae6fd',
+                    borderRadius: '16px',
+                    padding: '12px 18px'
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      flexShrink: 0
+                    }}
+                  >
+                    <Star size={18} fill="#ffffff" stroke="#ffffff" />
                   </div>
-                )}
-              </div>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#0369a1', fontSize: '0.9rem' }}>
+                      Earned {Math.round(booking.couponPointsEarned)} coupon points from this booking!
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
-            {/* QR Code and Barcode styling */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', backgroundColor: '#f8fafc', padding: '10px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <div style={{ width: '48px', height: '48px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <QrCode size={36} color="#0f172a" />
+            {/* Bottom Row: QR Code Stub + Slogan */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '16px',
+                marginTop: '4px'
+              }}
+            >
+              {/* QR Code and Barcode styling */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '14px',
+                  backgroundColor: '#f0f7ff',
+                  padding: '10px 18px',
+                  borderRadius: '14px',
+                  border: '1.5px solid #dbeafe'
+                }}
+              >
+                <div
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  <QrCode size={32} color="#0f172a" />
+                </div>
+
+                <div style={{ width: '1.5px', height: '34px', backgroundColor: '#93c5fd' }} />
+
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, letterSpacing: '0.05em' }}>
+                    AEROWINGS BOARDING SCAN
+                  </div>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+                    {booking.bookingReference}
+                  </div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'var(--font-mono)' }}>
-                  AEROWINGS BOARDING SCAN
+
+              {/* Slogan with stylish cursive font and curved underline */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', paddingRight: '8px' }}>
+                <div
+                  style={{
+                    fontFamily: "'Caveat', 'Dancing Script', 'Brush Script MT', 'Segoe Script', cursive",
+                    fontSize: '1.65rem',
+                    fontWeight: 700,
+                    color: '#4c1d95',
+                    letterSpacing: '0.02em',
+                    lineHeight: 1.1,
+                    fontStyle: 'italic',
+                    textShadow: '0 1px 2px rgba(76, 29, 149, 0.08)'
+                  }}
+                >
+                  Fly Better. Go Further.
                 </div>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-mono)' }}>
-                  {booking.bookingReference}
-                </div>
+                <svg width="150" height="14" viewBox="0 0 150 14" fill="none" style={{ marginTop: '2px' }}>
+                  <path d="M5 4C45 12 105 12 145 3" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Decorative Wave Bottom Bar like Image 2 */}
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '24px',
+            overflow: 'hidden',
+            backgroundColor: '#ffffff'
+          }}
+        >
+          <svg
+            viewBox="0 0 780 24"
+            fill="none"
+            preserveAspectRatio="none"
+            style={{ width: '100%', height: '100%', display: 'block' }}
+          >
+            <path
+              d="M0 16 Q 300 0, 780 12 L 780 24 L 0 24 Z"
+              fill="url(#cardBottomGradient)"
+            />
+            <path
+              d="M0 16 Q 300 0, 780 12"
+              stroke="#f59e0b"
+              strokeWidth="2.5"
+              fill="none"
+            />
+            <defs>
+              <linearGradient id="cardBottomGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#1e3a8a" />
+                <stop offset="50%" stopColor="#1e40af" />
+                <stop offset="100%" stopColor="#0f172a" />
+              </linearGradient>
+            </defs>
+          </svg>
         </div>
       </div>
 

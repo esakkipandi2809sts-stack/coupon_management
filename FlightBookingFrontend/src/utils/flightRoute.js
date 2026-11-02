@@ -164,8 +164,8 @@ export function formatDuration(durationOrMinutes) {
  */
 export function formatDistanceKm(distanceKm) {
   const dist = Number(distanceKm);
-  if (!Number.isFinite(dist) || dist <= 0) return '';
-  return `${Math.round(dist).toLocaleString()} km`;
+  // if (!Number.isFinite(dist) || dist <= 0) return '';
+  // return `${Math.round(dist).toLocaleString()} km`;
 }
 
 /**
@@ -174,7 +174,7 @@ export function formatDistanceKm(distanceKm) {
 export function formatDistance(distanceKm) {
   const dist = Number(distanceKm);
   if (!Number.isFinite(dist) || dist <= 0) return 'Distance unavailable';
-  return `Approximately ${Math.round(dist).toLocaleString()} km`;
+  // return `Approximately ${Math.round(dist).toLocaleString()} km`;
 }
 
 /**
@@ -264,7 +264,7 @@ export function determineStopCount(flightOrSegment) {
  */
 export function determineFlightType(stopCount) {
   const count = Number(stopCount);
-  return Number.isFinite(count) && count > 0 ? 'Connecting' : 'Direct';
+  // return Number.isFinite(count) && count > 0 ? 'Connecting' : 'Direct';
 }
 
 /**

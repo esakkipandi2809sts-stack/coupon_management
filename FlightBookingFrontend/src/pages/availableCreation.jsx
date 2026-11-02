@@ -83,7 +83,7 @@ const emptySegment = (overrides = {}) => ({
   arrivalDate: '',
   arrivalTime: '',
   duration: '',
-  totalSeats: '',
+  totalSeats: 120,
   availableSeats: '',
   status: 'Scheduled',
   ...overrides,
@@ -136,7 +136,7 @@ function toPayload(segment) {
     arrivalDate: segment.arrivalDate,
     arrivalTime: segment.arrivalTime.trim(),
     duration: normalizeDurationDisplay(segment.duration) || segment.duration.trim(),
-    totalSeats: parseInt(segment.totalSeats, 10),
+    totalSeats: 120,
     availableSeats: parseInt(segment.availableSeats, 10),
     status: segment.status,
   };
@@ -156,7 +156,7 @@ function segmentFromFlight(flight) {
     arrivalDate: flight.arrivalDate ?? '',
     arrivalTime: flight.arrivalTime ?? '',
     duration: flight.duration ?? '',
-    totalSeats: String(flight.totalSeats ?? ''),
+    totalSeats: String(flight.totalSeats ?? 120),
     availableSeats: String(flight.availableSeats ?? ''),
     status: flight.status || 'Scheduled',
   });
@@ -237,7 +237,7 @@ function validateSegment(segment, today) {
     errs.duration = 'Please enter a valid duration (e.g. 2h 15m or 135m).';
   }
 
-  const total = parseInt(segment.totalSeats, 10);
+  const total = 120;
   const available = parseInt(segment.availableSeats, 10);
   const priceVal = parseFloat(segment.price);
 
@@ -247,18 +247,12 @@ function validateSegment(segment, today) {
     errs.price = 'Price must be greater than zero.';
   }
 
-  if (segment.totalSeats === '') {
-    errs.totalSeats = 'Total Seats is required.';
-  } else if (Number.isNaN(total) || total <= 0) {
-    errs.totalSeats = 'Total Seats must be a positive number.';
-  }
-
   if (segment.availableSeats === '') {
     errs.availableSeats = 'Available Seats is required.';
   } else if (Number.isNaN(available) || available < 0) {
     errs.availableSeats = 'Available Seats cannot be negative.';
-  } else if (!Number.isNaN(total) && available > total) {
-    errs.availableSeats = 'Available Seats cannot exceed Total Seats.';
+  } else if (available > total) {
+    errs.availableSeats = 'Available Seats cannot exceed Total Seats (120).';
   }
 
   return errs;
@@ -403,7 +397,7 @@ function SegmentForm({
     id: fieldId(name),
     name,
     className: `ac-input${err(name) ? ' has-error' : ''}`,
-    value: segment[name],
+    value: name === 'totalSeats' ? 120 : (segment[name] ?? ''),
     onChange: (event) => onChange(index, name, event.target.value),
     disabled,
     'aria-invalid': err(name) ? 'true' : undefined,
@@ -606,8 +600,11 @@ function SegmentForm({
           <input
             {...input('totalSeats', {
               type: 'number',
-              min: 1,
-              placeholder: 'e.g. 180',
+              value: 120,
+              readOnly: true,
+              tabIndex: -1,
+              placeholder: '120',
+              onKeyDown: (e) => e.preventDefault(),
             })}
           />
         </Field>
@@ -622,13 +619,11 @@ function SegmentForm({
             {...input('availableSeats', {
               type: 'number',
               min: 0,
-              max: segment.totalSeats || undefined,
-              placeholder: 'e.g. 120',
+              max: parseInt(segment.totalSeats, 10) || 120,
+              placeholder: 'e.g. 100',
             })}
           />
         </Field>
-
-
       </div>
     </section>
   );
@@ -721,6 +716,7 @@ export default function AvailableCreation() {
   /* -------------------- Handle Field Changes -------------------- */
 
   const handleSegmentChange = (index, name, rawValue) => {
+    if (name === 'totalSeats') return;
     const value = rawValue;
 
     const list = segmentsByType[tripType].map((segment) => ({
@@ -1393,8 +1389,8 @@ export default function AvailableCreation() {
                     <td style={{ textAlign: 'center' }}>
                       <span
                         className={`ac-flight-status ${String(flight.status || '')
-                            .toLowerCase()
-                            .replace(/\s+/g, '-')
+                          .toLowerCase()
+                          .replace(/\s+/g, '-')
                           }`}
                       >
                         {flight.status || 'Scheduled'}
