@@ -868,6 +868,9 @@ export default function Availability() {
                         couponCode={location.state?.couponCode}
                         selectedCabin={searchedCabin}
                         passengerCount={totalPassengers}
+                        adults={adults}
+                        children={children}
+                        infants={infants}
                       />
                     ))}
                   </div>

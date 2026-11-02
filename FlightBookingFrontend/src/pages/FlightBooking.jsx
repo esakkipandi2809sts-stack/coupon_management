@@ -12,7 +12,7 @@ import { getFlightDetails } from '../utils/flightRoute';
 import './Availability.css';
 
 const EMPTY_PASSENGER = {
-  title: 'Mr',
+  title: '',
   firstName: '',
   lastName: '',
   name: '',
@@ -20,12 +20,12 @@ const EMPTY_PASSENGER = {
   dob: '',
   phone: '',
   age: '',
-  gender: 'Male',
+  gender: '',
   seat: ''
 };
 
 
-const TITLES = ['Mr', 'Mrs'];
+const TITLES = ['Mr', 'Mrs', 'Master', 'Baby'];
 
 const styles = {
   card: {
@@ -44,6 +44,31 @@ const styles = {
   error: {
     padding: 12, background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca',
     borderRadius: 10, fontSize: '0.85rem'
+  },
+  travellerLabel: {
+    display: 'block',
+    fontSize: '0.86rem',
+    fontWeight: 700,
+    color: '#334155',
+    marginBottom: 6,
+  },
+  travellerInput: {
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '9px 12px',
+    borderRadius: 8,
+    border: '1px solid #cbd5e1',
+    fontSize: '0.9rem',
+    outline: 'none',
+    background: '#fff',
+    height: 42,
+    color: '#1e293b',
+    transition: 'border-color 0.15s ease',
+  },
+  errorText: {
+    color: '#dc2626',
+    fontSize: '0.74rem',
+    margin: '3px 0 0',
   }
 };
 
@@ -154,13 +179,22 @@ function FormField({ label, value, onChange, error, type = 'text', placeholder =
 
 const calculateAgeFromDob = dobString => {
   if (!dobString) return '';
-  const d = new Date(dobString);
-  if (Number.isNaN(d.getTime())) return '';
+  const parts = String(dobString).split('-');
+  let birthDate;
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    birthDate = new Date(year, month, day);
+  } else {
+    birthDate = new Date(dobString);
+  }
+  if (Number.isNaN(birthDate.getTime())) return '';
 
   const today = new Date();
-  let age = today.getFullYear() - d.getFullYear();
-  const m = today.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
 
   return age >= 0 ? String(age) : '0';
 };
@@ -181,6 +215,24 @@ const makeRequestKey = () =>
     ? crypto.randomUUID()
     : `booking-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+const getTravellerLabel = (index, totalPassengers, adults, children, infants) => {
+  const numAdults = Number(adults) || 0;
+  const numChildren = Number(children) || 0;
+  const numInfants = Number(infants) || 0;
+
+  if (numAdults + numChildren + numInfants === totalPassengers && numAdults > 0) {
+    if (index < numAdults) {
+      return `ADT ${index + 1}`;
+    }
+    if (index < numAdults + numChildren) {
+      return `CHD ${index - numAdults + 1}`;
+    }
+    return `INF ${index - (numAdults + numChildren) + 1}`;
+  }
+
+  return `ADT ${index + 1}`;
+};
+
 /* ---------------- MAIN COMPONENT ---------------- */
 
 export default function FlightBooking() {
@@ -193,6 +245,11 @@ export default function FlightBooking() {
   const selectedClass = location.state?.selectedClass || 'Economy';
 
   const passengerCount = Math.min(27, Math.max(1, Number(location.state?.passengerCount) || 1));
+  const adultsCount = location.state?.adults;
+  const childrenCount = location.state?.children;
+  const infantsCount = location.state?.infants;
+  const [activeSeatIndex, setActiveSeatIndex] = useState(0);
+
   const initialCouponCode = location.state?.couponCode || '';
 
   const [passengers, setPassengers] = useState(() => {
@@ -201,7 +258,7 @@ export default function FlightBooking() {
     const first = parts[0] || '';
     const last = parts.slice(1).join(' ') || '';
 
-    return [{
+    const list = [{
       ...EMPTY_PASSENGER,
       firstName: first,
       lastName: last,
@@ -209,6 +266,12 @@ export default function FlightBooking() {
       email: user?.email || '',
       phone: user?.phoneNumber || ''
     }];
+
+    for (let i = 1; i < passengerCount; i++) {
+      list.push({ ...EMPTY_PASSENGER });
+    }
+
+    return list;
   });
 
   const [paymentMethod, setPaymentMethod] = useState('Credit Card');
@@ -333,6 +396,7 @@ export default function FlightBooking() {
         if (i !== index) return p;
         const updated = { ...p, [field]: value };
 
+        // Do not auto-select Gender; users must select Gender manually
         if (field === 'firstName' || field === 'lastName') {
           updated.name = [updated.firstName, updated.lastName]
             .map(part => (part || '').trim())
@@ -342,7 +406,7 @@ export default function FlightBooking() {
 
         if (field === 'dob') {
           const autoAge = calculateAgeFromDob(value);
-          if (autoAge !== '') updated.age = autoAge;
+          updated.age = autoAge;
         }
 
         return updated;
@@ -354,6 +418,7 @@ export default function FlightBooking() {
       const next = { ...previous, [index]: { ...previous[index] } };
       delete next[index][field];
       if (field === 'dob') delete next[index].age;
+      if (field === 'title') delete next[index].gender;
       return next;
     });
   };
@@ -388,8 +453,8 @@ export default function FlightBooking() {
     passengers.forEach((passenger, index) => {
       const err = {};
 
-      if (!passenger.title || !['Mr', 'Mrs'].includes(passenger.title)) {
-        err.title = 'Title must be either Mr or Mrs.';
+      if (!passenger.title || !TITLES.includes(passenger.title)) {
+        err.title = 'Please select a title.';
       }
       if (!passenger.firstName?.trim()) err.firstName = 'First name is required.';
       if (!passenger.lastName?.trim()) err.lastName = 'Last name is required.';
@@ -400,23 +465,32 @@ export default function FlightBooking() {
         err.dob = 'Date of birth cannot be in the future.';
       }
 
-      const email = (passenger.email || user?.email || '').trim();
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        err.email = 'Enter a valid email address.';
+      if (index === 0) {
+        const email = (passenger.email || user?.email || '').trim();
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          err.email = 'Enter a valid email address.';
+        }
+
+        if (!passenger.phone?.trim()) {
+          err.phone = 'Phone number is required.';
+        } else if (passenger.phone.replace(/\D/g, '').length < 7) {
+          err.phone = 'Enter a valid phone number.';
+        }
       }
 
-      if (!passenger.phone?.trim()) {
-        err.phone = 'Phone number is required.';
-      } else if (passenger.phone.replace(/\D/g, '').length < 7) {
-        err.phone = 'Enter a valid phone number.';
+      const effectiveAge = passenger.age !== undefined && passenger.age !== ''
+        ? Number(passenger.age)
+        : (passenger.dob ? Number(calculateAgeFromDob(passenger.dob)) : NaN);
+
+      if (Number.isNaN(effectiveAge) || effectiveAge < 0 || effectiveAge > 120) {
+        if (!err.dob) {
+          err.age = 'Enter a valid age between 0 and 120.';
+        }
       }
 
-      const age = Number(passenger.age);
-      if (passenger.age === '' || !Number.isInteger(age) || age < 1 || age > 120) {
-        err.age = 'Enter a valid age between 1 and 120.';
+      if (!passenger.gender) {
+        err.gender = 'Gender is required.';
       }
-
-      if (!passenger.gender) err.gender = 'Select a gender.';
 
       if (passenger.seat) {
         const seat = passenger.seat.trim().toUpperCase();
@@ -654,7 +728,7 @@ export default function FlightBooking() {
         passengerDob: firstPassenger.dob || '',
         dateOfBirth: firstPassenger.dob || '',
         passengerAge: Number(firstPassenger.age),
-        passengerGender: firstPassenger.gender || 'Male',
+        passengerGender: firstPassenger.gender || '',
         seatNumber: (firstPassenger.seat || '').trim().toUpperCase(),
         class: selectedClass,
         passengerCount,
@@ -667,20 +741,22 @@ export default function FlightBooking() {
         redeemCouponPoints: false,
         couponPointsToRedeem: 0,
 
-        passengers: passengers.map(passenger => {
+        passengers: passengers.map((passenger, index) => {
           const fullName = (
             passenger.name || `${passenger.firstName} ${passenger.lastName}`
           ).trim();
+          const effectiveAge = passenger.dob ? Number(calculateAgeFromDob(passenger.dob)) : (Number(passenger.age) || 0);
+          const effectiveGender = (passenger.gender || '').trim();
           return {
-            title: ['Mr', 'Mrs'].includes(passenger.title) ? passenger.title : 'Mr',
+            title: TITLES.includes(passenger.title) ? passenger.title : 'Mr',
             firstName: (passenger.firstName || '').trim(),
             lastName: (passenger.lastName || '').trim(),
             name: fullName,
-            email: (passenger.email || primaryEmail).trim(),
-            phone: (passenger.phone || firstPassenger.phone || '').trim(),
+            email: index === 0 ? primaryEmail : null,
+            phone: index === 0 ? (passenger.phone || firstPassenger.phone || '').trim() : null,
             dob: passenger.dob || '',
-            age: Number(passenger.age),
-            gender: passenger.gender || 'Male',
+            age: effectiveAge,
+            gender: effectiveGender,
             seat: (passenger.seat || '').trim().toUpperCase()
           };
         })
@@ -779,11 +855,40 @@ export default function FlightBooking() {
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 14px;
         }
+        .traveller-card {
+          padding: 16px 0;
+          border-bottom: 1px dashed #cbd5e1;
+        }
+        .traveller-card:last-child {
+          border-bottom: none;
+          padding-bottom: 0;
+        }
+        .traveller-badge {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 14px;
+        }
+        .traveller-inputs-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px 18px;
+        }
         @media (max-width: 990px) {
           .booking-grid { grid-template-columns: minmax(0, 1fr); }
         }
+        @media (max-width: 720px) {
+          .traveller-inputs-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
         @media (max-width: 600px) {
           .booking-three-fields { grid-template-columns: minmax(0, 1fr); }
+        }
+        @media (max-width: 500px) {
+          .traveller-inputs-grid {
+            grid-template-columns: minmax(0, 1fr);
+          }
         }
       `}</style>
 
@@ -857,164 +962,265 @@ export default function FlightBooking() {
             })()}
           </section>
 
-          {/* Passengers */}
+          {/* Traveller Details */}
           <section style={styles.card}>
-            <h2 style={{ fontSize: '1.15rem', marginTop: 0 }}>Passenger Details</h2>
-
-            <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '10px' }}>
-              Add details for all {passengerCount} passenger(s).
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              {passengers.map((passenger, index) => {
-                const errors = formErrors[index] || {};
-                const selectedSeat = (passenger.seat || '').trim().toUpperCase();
-
-                // Seats taken on the flight + seats already chosen by other passengers
-                const unavailableSeats = [
-                  ...effectiveBookedSeats,
-                  ...passengers
-                    .filter((_, otherIndex) => otherIndex !== index)
-                    .map(other => (other.seat || '').trim().toUpperCase())
-                    .filter(Boolean)
-                ];
-
-                return (
-                  <div key={index} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
-                    <div style={{
-                      display: 'flex', justifyContent: 'space-between',
-                      alignItems: 'center', marginBottom: 16
-                    }}>
-                      <h3 style={{ margin: 0, fontSize: '1rem' }}>
-                        <User size={17} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-                        Passenger {index + 1}
-                      </h3>
-
-                      {index > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => removePassenger(index)}
-                          style={{ border: 0, background: 'transparent', color: '#dc2626', cursor: 'pointer' }}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-
-                    <div style={{ marginBottom: 14 }} className="booking-three-fields">
-                      <FormField
-                        label="Title *"
-                        value={passenger.title}
-                        options={TITLES}
-                        error={errors.title}
-                        onChange={e => updatePassenger(index, 'title', e.target.value)}
-                      />
-
-                      <FormField
-                        label="First Name *"
-                        value={passenger.firstName}
-                        placeholder="Enter First name"
-                        error={errors.firstName}
-                        onChange={e => updatePassenger(index, 'firstName', e.target.value)}
-                      />
-
-                      <FormField
-                        label="Last Name *"
-                        value={passenger.lastName}
-                        placeholder="Enter Last name"
-                        error={errors.lastName}
-                        onChange={e => updatePassenger(index, 'lastName', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="booking-three-fields" style={{ marginBottom: 14 }}>
-                      <FormField
-                        label="Date of Birth *"
-                        type="date"
-                        value={passenger.dob}
-                        error={errors.dob}
-                        max={new Date().toISOString().split('T')[0]}
-                        onChange={e => updatePassenger(index, 'dob', e.target.value)}
-                      />
-
-                      <FormField
-                        label="Age *"
-                        type="number"
-                        min="1"
-                        max="120"
-                        value={passenger.age}
-                        placeholder="Age"
-                        error={errors.age}
-                        onChange={e => updatePassenger(index, 'age', e.target.value)}
-                      />
-
-                      <FormField
-                        label="Gender *"
-                        value={passenger.gender}
-                        options={['Male', 'Female', 'Other']}
-                        error={errors.gender}
-                        onChange={e => updatePassenger(index, 'gender', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="booking-three-fields" style={{ marginBottom: 14 }}>
-                      <FormField
-                        label="Email Address *"
-                        type="email"
-                        value={passenger.email}
-                        placeholder="passenger@example.com"
-                        error={errors.email}
-                        onChange={e => updatePassenger(index, 'email', e.target.value)}
-                      />
-
-                      <FormField
-                        label="Phone Number *"
-                        type="tel"
-                        value={passenger.phone}
-                        placeholder="+91 98765 43210"
-                        error={errors.phone}
-                        onChange={e => updatePassenger(index, 'phone', e.target.value)}
-                      />
-
-                      <FormField
-                        label="Seat (Optional)"
-                        value={passenger.seat}
-                        placeholder="e.g. 14B"
-                        error={errors.seat}
-                        onChange={e => updatePassenger(index, 'seat', e.target.value.toUpperCase())}
-                      />
-                    </div>
-
-                    <SeatMap
-                      bookedSeats={unavailableSeats}
-                      selectedSeat={selectedSeat}
-                      onSelect={seat => updatePassenger(index, 'seat', selectedSeat === seat ? '' : seat)}
-                    />
-                  </div>
-                );
-              })}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Traveller Details
+              </h2>
 
               {passengers.length < passengerCount && (
                 <button
                   type="button"
                   onClick={addPassenger}
                   style={{
-                    ...styles.primaryButton,
+                    padding: '7px 14px',
+                    borderRadius: '8px',
+                    border: '1px dashed #0284c7',
                     background: '#f0f9ff',
-                    color: '#0369a1',
-                    border: '1px dashed #0284c7'
+                    color: '#0284c7',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
                   }}
                 >
-                  + Add Passenger ({passengers.length}/{passengerCount})
+                  + Add Traveller ({passengers.length}/{passengerCount})
                 </button>
               )}
-
-              <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569' }}>
-                Passenger details added: {passengers.length}/{passengerCount}
-              </p>
             </div>
 
-   
+            <div>
+              {passengers.map((passenger, index) => {
+                const errors = formErrors[index] || {};
+                const travellerLabel = getTravellerLabel(index, passengerCount, adultsCount, childrenCount, infantsCount);
+
+                return (
+                  <div key={index} className="traveller-card">
+                    {/* Traveller badge: Red UserCheck icon + Code */}
+                    <div className="traveller-badge">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H12" />
+                        <circle cx="14" cy="7" r="4" />
+                        <circle cx="6.5" cy="17.5" r="3.5" />
+                        <polyline points="5.3 17.5 6.2 18.4 7.7 16.6" />
+                      </svg>
+                      <span style={{ fontWeight: 800, fontSize: '0.98rem', color: '#0f172a', letterSpacing: '0.01em' }}>
+                        {travellerLabel}
+                      </span>
+                    </div>
+
+                    {/* Form fields matching screenshot format */}
+                    <div className="traveller-inputs-grid">
+                      <div>
+                        <label style={styles.travellerLabel}>
+                          Title <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <select
+                          value={passenger.title}
+                          onChange={e => updatePassenger(index, 'title', e.target.value)}
+                          style={{
+                            ...styles.travellerInput,
+                            borderColor: errors.title ? '#ef4444' : '#cbd5e1'
+                          }}
+                        >
+                          <option value="">Select</option>
+                          {TITLES.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                        {errors.title && <p style={styles.errorText}>{errors.title}</p>}
+                      </div>
+
+                      <div>
+                        <label style={styles.travellerLabel}>
+                          First Name<span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={passenger.firstName}
+                          onChange={e => updatePassenger(index, 'firstName', e.target.value)}
+                          placeholder=""
+                          style={{
+                            ...styles.travellerInput,
+                            borderColor: errors.firstName ? '#ef4444' : '#cbd5e1'
+                          }}
+                        />
+                        {errors.firstName && <p style={styles.errorText}>{errors.firstName}</p>}
+                      </div>
+
+                      <div>
+                        <label style={styles.travellerLabel}>
+                          Last Name<span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={passenger.lastName}
+                          onChange={e => updatePassenger(index, 'lastName', e.target.value)}
+                          placeholder=""
+                          style={{
+                            ...styles.travellerInput,
+                            borderColor: errors.lastName ? '#ef4444' : '#cbd5e1'
+                          }}
+                        />
+                        {errors.lastName && <p style={styles.errorText}>{errors.lastName}</p>}
+                      </div>
+
+                      <div>
+                        <label style={styles.travellerLabel}>
+                          Gender<span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <select
+                          value={passenger.gender || ''}
+                          onChange={e => updatePassenger(index, 'gender', e.target.value)}
+                          style={{
+                            ...styles.travellerInput,
+                            borderColor: errors.gender ? '#ef4444' : '#cbd5e1'
+                          }}
+                        >
+                          <option value="">Select</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                        {errors.gender && <p style={styles.errorText}>{errors.gender}</p>}
+                      </div>
+
+                      <div>
+                        <label style={styles.travellerLabel}>
+                          Date Of Birth <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={passenger.dob}
+                          max={new Date().toISOString().split('T')[0]}
+                          onChange={e => updatePassenger(index, 'dob', e.target.value)}
+                          style={{
+                            ...styles.travellerInput,
+                            borderColor: errors.dob ? '#ef4444' : '#cbd5e1'
+                          }}
+                        />
+                        {errors.dob && <p style={styles.errorText}>{errors.dob}</p>}
+                      </div>
+
+                      <div>
+                        <label style={styles.travellerLabel}>
+                          Age<span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={passenger.age !== undefined && passenger.age !== '' ? passenger.age : (passenger.dob ? calculateAgeFromDob(passenger.dob) : '')}
+                          onChange={e => updatePassenger(index, 'age', e.target.value)}
+                          placeholder=""
+                          min="0"
+                          max="120"
+                          style={{
+                            ...styles.travellerInput,
+                            borderColor: errors.age ? '#ef4444' : '#cbd5e1'
+                          }}
+                        />
+                        {errors.age && <p style={styles.errorText}>{errors.age}</p>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Contact Details (Passenger 1 / Primary Contact) */}
+            <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px dashed #cbd5e1' }}>
+              <div style={{ marginBottom: 14 }}>
+                <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#1e293b' }}>
+                  Contact Details (Passenger 1 / Primary Contact)
+                </h3>
+
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+                <div>
+                  <label style={styles.travellerLabel}>
+                    Email Address <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={passengers[0]?.email || ''}
+                    placeholder="passenger@example.com"
+                    onChange={e => updatePassenger(0, 'email', e.target.value)}
+                    style={{
+                      ...styles.travellerInput,
+                      borderColor: formErrors[0]?.email ? '#ef4444' : '#cbd5e1'
+                    }}
+                  />
+                  {formErrors[0]?.email && <p style={styles.errorText}>{formErrors[0].email}</p>}
+                </div>
+
+                <div>
+                  <label style={styles.travellerLabel}>
+                    Phone Number <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={passengers[0]?.phone || ''}
+                    placeholder="+91 98765 43210"
+                    onChange={e => updatePassenger(0, 'phone', e.target.value)}
+                    style={{
+                      ...styles.travellerInput,
+                      borderColor: formErrors[0]?.phone ? '#ef4444' : '#cbd5e1'
+                    }}
+                  />
+                  {formErrors[0]?.phone && <p style={styles.errorText}>{formErrors[0].phone}</p>}
+                </div>
+              </div>
+            </div>
+
+            {/* Seat Selection (Optional) */}
+            <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px dashed #cbd5e1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#1e293b' }}>
+                    Seat Selection (Optional)
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    Select a seat on the interactive plane map for each traveller
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {passengers.map((p, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setActiveSeatIndex(idx)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: activeSeatIndex === idx ? '1.5px solid #0284c7' : '1px solid #cbd5e1',
+                        background: activeSeatIndex === idx ? '#f0f9ff' : '#ffffff',
+                        color: activeSeatIndex === idx ? '#0284c7' : '#334155',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {getTravellerLabel(idx, passengerCount, adultsCount, childrenCount, infantsCount)}: {p.seat || 'No Seat'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <SeatMap
+                bookedSeats={[
+                  ...effectiveBookedSeats,
+                  ...passengers
+                    .filter((_, otherIndex) => otherIndex !== activeSeatIndex)
+                    .map(other => (other.seat || '').trim().toUpperCase())
+                    .filter(Boolean)
+                ]}
+                selectedSeat={(passengers[activeSeatIndex]?.seat || '').trim().toUpperCase()}
+                onSelect={seat => {
+                  const currentSeat = (passengers[activeSeatIndex]?.seat || '').trim().toUpperCase();
+                  updatePassenger(activeSeatIndex, 'seat', currentSeat === seat ? '' : seat);
+                }}
+              />
+            </div>
           </section>
         </div>
 

@@ -94,7 +94,7 @@ function getSchedule(flight) {
   };
 }
 
-export default function FlightCard({ flight, couponCode, selectedCabin = 'All', passengerCount = 1 }) {
+export default function FlightCard({ flight, couponCode, selectedCabin = 'All', passengerCount = 1, adults, children, infants }) {
   const navigate = useNavigate();
   const [openPanel, setOpenPanel] = useState(null);
 
@@ -127,6 +127,9 @@ export default function FlightCard({ flight, couponCode, selectedCabin = 'All', 
         baseFare,
         selectedClass: bookingClass,
         passengerCount: Math.max(1, Number(passengerCount) || 1),
+        adults: adults !== undefined ? Number(adults) : undefined,
+        children: children !== undefined ? Number(children) : undefined,
+        infants: infants !== undefined ? Number(infants) : undefined,
         couponCode,
       },
     });

@@ -57,14 +57,14 @@ namespace FlightBookingBackend.Services
                 return (false, "Flight not found.", null);
             }
 
-            // 2b. Validate Passenger Titles: only "Mr" and "Mrs" are allowed
+            // 2b. Validate Passenger Titles: only "Mr", "Mrs", "Child", "Infant" are allowed
             if (dto.Passengers != null && dto.Passengers.Count > 0)
             {
                 foreach (var p in dto.Passengers)
                 {
-                    if (!string.IsNullOrWhiteSpace(p.Title) && p.Title != "Mr" && p.Title != "Mrs")
+                    if (!string.IsNullOrWhiteSpace(p.Title) && p.Title != "Mr" && p.Title != "Mrs" && p.Title != "Child" && p.Title != "Infant")
                     {
-                        return (false, "Title must be either 'Mr' or 'Mrs'.", null);
+                        return (false, "Title must be either 'Mr', 'Mrs', 'Child', or 'Infant'.", null);
                     }
                 }
             }
@@ -195,18 +195,28 @@ namespace FlightBookingBackend.Services
 
                 foreach (var p in passengersList)
                 {
-                    if (string.IsNullOrWhiteSpace(p.Title) || (p.Title != "Mr" && p.Title != "Mrs"))
+                    if (string.IsNullOrWhiteSpace(p.Title) || (p.Title != "Mr" && p.Title != "Mrs" && p.Title != "Child" && p.Title != "Infant"))
                     {
                         p.Title = "Mr";
                     }
                 }
 
-                var serializedPassengers = JsonSerializer.Serialize(passengersList);
-
                 var primaryPassenger = passengersList[0];
                 var primaryName = !string.IsNullOrWhiteSpace(primaryPassenger.Name) ? primaryPassenger.Name.Trim() : dto.PassengerName.Trim();
                 var primaryEmail = !string.IsNullOrWhiteSpace(primaryPassenger.Email) ? primaryPassenger.Email.Trim() : dto.PassengerEmail.Trim();
                 var primaryPhone = !string.IsNullOrWhiteSpace(primaryPassenger.Phone) ? primaryPassenger.Phone.Trim() : dto.PassengerPhone.Trim();
+
+                primaryPassenger.Email = primaryEmail;
+                primaryPassenger.Phone = primaryPhone;
+
+                // Contact Email and Phone Number are stored only once for Passenger 1 / primary booking contact
+                for (int i = 1; i < passengersList.Count; i++)
+                {
+                    passengersList[i].Email = null;
+                    passengersList[i].Phone = null;
+                }
+
+                var serializedPassengers = JsonSerializer.Serialize(passengersList);
                 var primaryAge = primaryPassenger.Age > 0 ? primaryPassenger.Age : dto.PassengerAge;
                 var primaryGender = !string.IsNullOrWhiteSpace(primaryPassenger.Gender) ? primaryPassenger.Gender.Trim() : dto.PassengerGender.Trim();
                 var primarySeat = !string.IsNullOrWhiteSpace(primaryPassenger.Seat) ? primaryPassenger.Seat.Trim().ToUpper() : dto.SeatNumber.Trim().ToUpper();
