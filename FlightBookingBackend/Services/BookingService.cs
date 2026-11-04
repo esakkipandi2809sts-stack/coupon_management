@@ -57,18 +57,6 @@ namespace FlightBookingBackend.Services
                 return (false, "Flight not found.", null);
             }
 
-            // 2b. Validate Passenger Titles: only "Mr", "Mrs", "Child", "Infant" are allowed
-            if (dto.Passengers != null && dto.Passengers.Count > 0)
-            {
-                foreach (var p in dto.Passengers)
-                {
-                    if (!string.IsNullOrWhiteSpace(p.Title) && p.Title != "Mr" && p.Title != "Mrs" && p.Title != "Child" && p.Title != "Infant")
-                    {
-                        return (false, "Title must be either 'Mr', 'Mrs', 'Child', or 'Infant'.", null);
-                    }
-                }
-            }
-
             // 3. Check seat availability
             if (flight.AvailableSeats < dto.PassengerCount)
             {
@@ -85,7 +73,7 @@ namespace FlightBookingBackend.Services
             // multiplier once, then multiply by the requested passenger count.
             var originalBaseFare = flight.Price > 0m
                 ? flight.Price
-                : FlightFareCalculator.CalculateEconomyFare(distanceKm, flight.DepartureTime, flight.FlightNumber, flight.Airline);
+                : FlightFareCalculator.CalculateEconomyFare(distanceKm);
             var farePerPassenger = (int)Math.Round(FlightFareCalculator.CalculateClassFare(originalBaseFare, dto.Class), 0, MidpointRounding.AwayFromZero);
             var baseFare = (int)Math.Round(farePerPassenger * (decimal)dto.PassengerCount, 0, MidpointRounding.AwayFromZero);
             var taxes = 0m;
@@ -167,7 +155,7 @@ namespace FlightBookingBackend.Services
                 var pointsDiscountAmount = (dto.RedeemCouponPoints && appliedCoupon == null)
                     ? Math.Floor(Math.Min(availableCouponPoints / 10m, remainingFareAfterCoupon))
                     : 0m;
-                var pointsRedeemed = pointsDiscountAmount * 10m;
+                var pointsRedeemed = pointsDiscountAmount * 4m;
                 var discountAmount = Math.Round(couponDiscountAmount + pointsDiscountAmount, 0, MidpointRounding.AwayFromZero);
                 var finalAmount = AirlineClassCouponCalculator.CalculateFinalFare(baseFare, (int)discountAmount);
 
@@ -183,7 +171,6 @@ namespace FlightBookingBackend.Services
                     {
                         new PassengerDto
                         {
-                            Title = "Mr",
                             Name = dto.PassengerName.Trim(),
                             Email = dto.PassengerEmail.Trim(),
                             Phone = dto.PassengerPhone.Trim(),
@@ -193,30 +180,12 @@ namespace FlightBookingBackend.Services
                         }
                     };
 
-                foreach (var p in passengersList)
-                {
-                    if (string.IsNullOrWhiteSpace(p.Title) || (p.Title != "Mr" && p.Title != "Mrs" && p.Title != "Child" && p.Title != "Infant"))
-                    {
-                        p.Title = "Mr";
-                    }
-                }
+                var serializedPassengers = JsonSerializer.Serialize(passengersList);
 
                 var primaryPassenger = passengersList[0];
                 var primaryName = !string.IsNullOrWhiteSpace(primaryPassenger.Name) ? primaryPassenger.Name.Trim() : dto.PassengerName.Trim();
                 var primaryEmail = !string.IsNullOrWhiteSpace(primaryPassenger.Email) ? primaryPassenger.Email.Trim() : dto.PassengerEmail.Trim();
                 var primaryPhone = !string.IsNullOrWhiteSpace(primaryPassenger.Phone) ? primaryPassenger.Phone.Trim() : dto.PassengerPhone.Trim();
-
-                primaryPassenger.Email = primaryEmail;
-                primaryPassenger.Phone = primaryPhone;
-
-                // Contact Email and Phone Number are stored only once for Passenger 1 / primary booking contact
-                for (int i = 1; i < passengersList.Count; i++)
-                {
-                    passengersList[i].Email = null;
-                    passengersList[i].Phone = null;
-                }
-
-                var serializedPassengers = JsonSerializer.Serialize(passengersList);
                 var primaryAge = primaryPassenger.Age > 0 ? primaryPassenger.Age : dto.PassengerAge;
                 var primaryGender = !string.IsNullOrWhiteSpace(primaryPassenger.Gender) ? primaryPassenger.Gender.Trim() : dto.PassengerGender.Trim();
                 var primarySeat = !string.IsNullOrWhiteSpace(primaryPassenger.Seat) ? primaryPassenger.Seat.Trim().ToUpper() : dto.SeatNumber.Trim().ToUpper();
@@ -266,8 +235,6 @@ namespace FlightBookingBackend.Services
                     PassengerDetails = serializedPassengers,
                     BookingDate = DateTime.UtcNow,
                     FlightJourneyDate = flight.DepartureDate,
-                    FromCity = flight.FromCity,
-                    ToCity = flight.ToCity,
                     DistanceKm = distanceKm,
                     BaseFare = baseFare,
                     Taxes = taxes,
@@ -325,7 +292,7 @@ namespace FlightBookingBackend.Services
                         TransactionType = "Redeemed",
                         Points = pointsRedeemed,
                         DiscountAmount = pointsDiscountAmount,
-                        Status = "Used",
+                        Status = "Redeemed",
                         TransactionDate = DateTime.UtcNow
                     });
                 }
@@ -495,8 +462,6 @@ namespace FlightBookingBackend.Services
                     PassengerCount = dto.PassengerCount,
                     BookingDate = DateTime.UtcNow,
                     FlightJourneyDate = flight.DepartureDate,
-                    FromCity = flight.FromCity,
-                    ToCity = flight.ToCity,
                     DistanceKm = distanceKm,
                     BaseFare = baseFare,
                     Taxes = 0m,
@@ -549,8 +514,6 @@ namespace FlightBookingBackend.Services
 
         public async Task<IEnumerable<BookingDetailDto>> GetUserBookingsAsync(int userId)
         {
-            await UpdatePassedBookingsToTravelledAsync();
-
             var bookings = await _context.Bookings
                 .Include(b => b.Flight)
                 .Include(b => b.CouponUsages)
@@ -566,8 +529,6 @@ namespace FlightBookingBackend.Services
 
         public async Task<BookingDetailDto?> GetBookingByIdAsync(int bookingId, int userId)
         {
-            await UpdatePassedBookingsToTravelledAsync();
-
             var booking = await _context.Bookings
                 .Include(b => b.Flight)
                 .Include(b => b.CouponUsages)
@@ -602,12 +563,6 @@ namespace FlightBookingBackend.Services
             {
                 await transaction.RollbackAsync();
                 return (false, "A failed booking cannot be cancelled.");
-            }
-
-            if (string.Equals(booking.BookingStatus, BookingStatuses.Travelled, StringComparison.OrdinalIgnoreCase))
-            {
-                await transaction.RollbackAsync();
-                return (false, "A travelled booking cannot be cancelled.");
             }
 
             // Update Booking Status to Cancelled in the database
@@ -675,7 +630,7 @@ namespace FlightBookingBackend.Services
                     couponTransaction.BookingId == bookingId &&
                     couponTransaction.UserId == booking.UserId &&
                     couponTransaction.TransactionType == "Redeemed" &&
-                    (couponTransaction.Status == "Redeemed" || couponTransaction.Status == "Used"))
+                    couponTransaction.Status == "Redeemed")
                 .ToListAsync();
             foreach (var t in redeemedTransactions)
             {
@@ -720,7 +675,6 @@ namespace FlightBookingBackend.Services
                 {
                     BookingStatuses.Cancelled => "A cancelled booking cannot be rescheduled.",
                     BookingStatuses.Failed => "A failed booking cannot be rescheduled.",
-                    BookingStatuses.Travelled => "A travelled booking cannot be rescheduled.",
                     _ => "Only confirmed bookings can be rescheduled."
                 };
                 return (false, reason, null);
@@ -786,7 +740,7 @@ namespace FlightBookingBackend.Services
             // Calculate new fare for the chosen flight, preserving passenger count and class multiplier.
             var newBaseEconomyFare = newFlight.Price > 0m
                 ? newFlight.Price
-                : FlightFareCalculator.ResolveBaseFare(newFlight.DistanceKm, newFlight.DepartureTime, newFlight.FlightNumber, newFlight.Airline);
+                : FlightFareCalculator.ResolveBaseFare(newFlight.DistanceKm);
             var newFarePerPassenger = (int)Math.Round(FlightFareCalculator.CalculateClassFare(newBaseEconomyFare, booking.Class), 0, MidpointRounding.AwayFromZero);
             var newTotalBaseFare = (int)Math.Round(newFarePerPassenger * (decimal)booking.PassengerCount, 0, MidpointRounding.AwayFromZero);
             var discount = booking.DiscountAmount;
@@ -799,14 +753,11 @@ namespace FlightBookingBackend.Services
             booking.Flight = newFlight;
             booking.FlightId = newFlight.FlightId;
             booking.FlightJourneyDate = newFlight.DepartureDate;
-            booking.FromCity = newFlight.FromCity;
-            booking.ToCity = newFlight.ToCity;
             booking.DistanceKm = newFlight.DistanceKm;
             booking.BaseFare = newTotalBaseFare;
             booking.TicketPrice = newTicketPrice;
             booking.SeatNumber = seatNumber;
             booking.BookingStatus = BookingStatuses.Rescheduled;
-            booking.RescheduleDate = DateTime.UtcNow;
 
             if (!string.IsNullOrWhiteSpace(booking.PassengerDetails))
             {
@@ -867,22 +818,11 @@ namespace FlightBookingBackend.Services
                 return (false, "A failed booking cannot be rescheduled.", null);
             }
 
-            if (string.Equals(booking.BookingStatus, BookingStatuses.Travelled, StringComparison.OrdinalIgnoreCase))
-            {
-                return (false, "A travelled booking cannot be rescheduled.", null);
-            }
-
             booking.BookingStatus = BookingStatuses.Rescheduled;
-            booking.RescheduleDate = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             var updated = await GetBookingByIdAsync(bookingId, userId);
             return (true, "Booking status updated to Rescheduled successfully.", updated);
-        }
-
-        public Task<int> UpdatePassedBookingsToTravelledAsync()
-        {
-            return BookingStatusTransitionHelper.UpdatePassedBookingsToTravelledAsync(_context, _couponService.GetBusinessDate());
         }
 
         private static BookingDetailDto MapToDetailDto(Booking b)
@@ -900,7 +840,7 @@ namespace FlightBookingBackend.Services
             var distanceKm = b.DistanceKm ?? b.Flight?.DistanceKm;
             var economyFare = b.Flight != null && b.Flight.Price > 0m
                 ? b.Flight.Price
-                : FlightFareCalculator.ResolveBaseFare(distanceKm, b.Flight?.DepartureTime, b.Flight?.FlightNumber, b.Flight?.Airline);
+                : FlightFareCalculator.ResolveBaseFare(distanceKm);
             var calculatedFare = economyFare > 0m
                 ? FlightFareCalculator.CalculateClassFare(economyFare, b.Class)
                 : final;
@@ -944,11 +884,10 @@ namespace FlightBookingBackend.Services
                 BookingStatus = b.BookingStatus,
                 PaymentStatus = b.PaymentStatus,
                 CancelDate = b.CancelDate,
-                RescheduleDate = b.RescheduleDate,
                 FlightNumber = b.Flight?.FlightNumber ?? "N/A",
                 Airline = b.Flight?.Airline ?? "N/A",
-                FromCity = !string.IsNullOrWhiteSpace(b.FromCity) ? b.FromCity : (b.Flight?.FromCity ?? "N/A"),
-                ToCity = !string.IsNullOrWhiteSpace(b.ToCity) ? b.ToCity : (b.Flight?.ToCity ?? "N/A"),
+                FromCity = b.Flight?.FromCity ?? "N/A",
+                ToCity = b.Flight?.ToCity ?? "N/A",
                 DepartureDate = b.Flight?.DepartureDate ?? DateOnly.MinValue,
                 DepartureTime = b.Flight?.DepartureTime ?? "N/A",
                 ArrivalDate = b.Flight?.ArrivalDate ?? DateOnly.MinValue,
